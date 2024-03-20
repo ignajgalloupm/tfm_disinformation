@@ -24,6 +24,10 @@ class WikiDataset(Dataset):
             # keep in self.dataset only the pages that are in wiki_dict.keys()
             self.dataset = [page for page in self.dataset if page['id'] in wiki_dict]
 
+            # free memory deleting fever and wiki_dict
+            del fever
+            del wiki_dict
+
 
     def __len__(self):            
         return len(self.dataset)
