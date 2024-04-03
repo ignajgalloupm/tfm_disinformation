@@ -14,6 +14,8 @@ class EmbeddingGenerator():
             self.model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2').to(device)
         elif encoder == 'UAE-Large-V1':
             self.model = AnglE.from_pretrained('WhereIsAI/UAE-Large-V1', pooling_strategy='cls').to(device)
+        # set the model to half precision
+        self.model = self.model.half()
 
 
     def generate(self, wiki_loader):
