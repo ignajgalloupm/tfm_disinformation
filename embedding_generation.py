@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 from angle_emb import AnglE, Prompts
 from sentence_transformers import SentenceTransformer

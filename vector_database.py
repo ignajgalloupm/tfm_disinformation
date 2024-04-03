@@ -1,14 +1,11 @@
 import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams, PointStruct
+from embedding_generation import EmbeddingGenerator
 from qdrant_client.http import models
 import time
 import os
 
-distances = {
-    'mpnet': Distance.DOT,
-    'UAE-Large-V1': Distance.EUCLID,
-}
 
 class VectorDatabase():
 
@@ -17,12 +14,12 @@ class VectorDatabase():
         self.collection = f'{encoder}_{version}'
         if client == 'local':
             self.client = QdrantClient(':memory:')
-            self.start_collection(wiki)
+            self.start_collection(wiki, encoder, version)
 
         elif client == 'docker':
             self.client = QdrantClient(f'{ip}:{port}')
             if self.collection not in [c.name for c in self.client.get_collections().collections]:
-                self.start_collection(wiki)
+                self.start_collection(wiki, encoder, version)
         else:
             raise Exception('Invalid client type')
         
@@ -38,16 +35,25 @@ class VectorDatabase():
         return self.client.search_batch(collection_name=self.collection, requests=search_queries)
         
 
-    def start_collection(self, wiki):
+    def start_collection(self, wiki, encoder, version):
+        if wiki is None:
+            raise Exception('wiki is required to create collection')
+        
         init = time.time()
+
+        print('Generating embeddings')
+        emb_gen = EmbeddingGenerator(encoder=encoder, version=version)
+        #emb_gen.generate(wiki)
+        print('Time of generation:', time.time() - init)
+
         print('Creating collection')
         # count the number of files in folder embeddings
-        for i, f in enumerate(os.listdir('embeddings')):
-            data, vector_size = self.loadData(i, f, wiki)
+        for i, pages in enumerate(wiki):
+            data, vector_size = self.loadData(i, pages)
             if i == 0:
                 self.client.create_collection(
                     collection_name=self.collection,
-                    vectors_config=VectorParams(size=vector_size, distance=Distance.DOT),
+                    vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
                 )
             self.client.upload_points(
                 collection_name=self.collection,
@@ -58,14 +64,17 @@ class VectorDatabase():
         print('Time:', time.time() - init)
 
         
-    def loadData(self, i, file, wiki):
-        embeddings = np.load(f'embeddings/{file}')
+    def loadData(self, i, pages):
+        ids, texts, lines = pages['id'], pages['text'], pages['lines']
+
+        embeddings = np.load(f'embeddings/{self.collection}/{i}.npy')
         vector_size = embeddings.shape[1]
-        data = []
-        for j in range(embeddings.shape[0]):
-            page = wiki[i*embeddings.shape[0] + j]
-            id, text, lines = page['id'], page['text'], page['lines']
-            ps = PointStruct(id=id, vector=embeddings[j].tolist(), payload={"text": text, "lines": lines})
-            data.append(ps)
+        data = [PointStruct(id=id, vector=embeddings[j].tolist(), payload={"text": text, "lines": lines}) for j, id, text, lines in zip(range(embeddings.shape[0]), ids, texts, lines)]
+        print(data)
+        # for j in range(embeddings.shape[0]):
+        #     page = wiki[i*embeddings.shape[0] + j]
+        #     id, text, lines = page['id'], page['text'], page['lines']
+        #     ps = PointStruct(id=id, vector=embeddings[j].tolist(), payload={"text": text, "lines": lines})
+        #     data.append(ps)
         return data, vector_size
 
