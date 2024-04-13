@@ -12,9 +12,10 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 
-class EmbeddingGenerator():
+class EmbeddingGenerator(torch.nn.Module):
 
     def __init__(self, encoder='mpnet', version='v1', device='cuda'):
+        super(EmbeddingGenerator, self).__init__()
         self.name = f'{encoder}_{version}'
         os.makedirs(f'embeddings/{self.name}', exist_ok=True)
         if encoder == 'mpnet':
@@ -25,5 +26,5 @@ class EmbeddingGenerator():
         self.model = torch.compile(model.half())
         
     
-    def __call__(self, texts):
+    def forward(self, texts):
         return self.model.encode(texts)

@@ -15,7 +15,7 @@ PAGES_PER_FILE = 50000
 
 
 class WikiDataset(Dataset):
-    def __init__(self, type='train', in_mem=False, reduced=True, num_extra_pages=0, seed=0):
+    def __init__(self, in_mem=False, reduced=True, type='train', num_extra_pages=0, seed=None):
         self.in_mem = in_mem
 
         if type not in ['train', 'dev', 'test']:
