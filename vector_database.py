@@ -4,23 +4,29 @@ from qdrant_client.http.models import Distance, VectorParams, PointStruct
 from embedding_generation import EmbeddingGenerator
 from qdrant_client.http import models
 import time
-import os
+
+# log and warning suppression
+import logging
+logging.getLogger('qdrant_client').setLevel(logging.ERROR)
+logging.getLogger('httpx').setLevel(logging.ERROR)
+
+PAGES_PER_FILE = 50000
 
 
 class VectorDatabase():
 
-    def __init__(self, client='local', ip='localhost', port=6333, encoder='mpnet', version='v1', wiki=None):
+    def __init__(self, client='local', ip='localhost', port=6333, encoder='mpnet', version='v1', wiki_loader=None):
         self.collection = f'{encoder}_{version}'
         if client == 'local':
             self.client = QdrantClient(':memory:')
-            self.start_collection(wiki, encoder, version)
+            self.start_collection(wiki_loader, encoder, version)
 
         elif client == 'docker':
             self.client = QdrantClient(f'{ip}:{port}')
             if self.collection in [c.name for c in self.client.get_collections().collections]:
                 ## delete collection
                 self.client.delete_collection(collection_name=self.collection)
-            self.start_collection(wiki, encoder, version)
+            self.start_collection(wiki_loader, encoder, version)
         else:
             raise Exception('Invalid client type')
         
@@ -36,20 +42,16 @@ class VectorDatabase():
         return self.client.search_batch(collection_name=self.collection, requests=search_queries)
         
 
-    def start_collection(self, wiki, encoder, version):
-        if wiki is None:
+    def start_collection(self, wiki_loader, encoder, version):
+        print('Creating collection')
+        if wiki_loader is None:
             raise Exception('wiki is required to create collection')
         init = time.time()
 
-        print('Generating embeddings')
         emb_gen = EmbeddingGenerator(encoder=encoder, version=version)
-        emb_gen.generate(wiki)
-        print('Time of embedding generation:', time.time() - init)
 
-        print('Creating collection')
-        for i, pages in enumerate(wiki):
-            data, vector_size = self.loadData(i, pages)
-            print(len(data))
+        for i, pages in enumerate(wiki_loader):
+            data, vector_size = self.loadData(i, pages, emb_gen)
             if i == 0:
                 self.client.create_collection(
                     collection_name=self.collection,
@@ -61,14 +63,15 @@ class VectorDatabase():
                 parallel=4,
                 max_retries=3,
             )
+            print(f'Block {i+1}/{len(wiki_loader)} done')
         print('Time to create collection:', time.time() - init)
 
         
-    def loadData(self, i, pages):
+    def loadData(self, i, pages, emb_gen):
         ids, texts = pages['id'], pages['text'] #, pages['lines']
-        embeddings = np.load(f'embeddings/{self.collection}/{i}.npy')
+        embeddings = emb_gen(texts)
         num_pages, vector_size = embeddings.shape[0], embeddings.shape[1]
-        data = [PointStruct(id=i*num_pages+j, vector=embeddings[j], payload={"id": id, "text": text}) 
+        data = [PointStruct(id=i*PAGES_PER_FILE+j, vector=embeddings[j], payload={"id": id, "text": text}) 
                 for j, id, text in zip(range(num_pages), ids, texts)] #, "lines": lines
         return data, vector_size
 

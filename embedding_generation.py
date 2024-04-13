@@ -2,6 +2,14 @@ import numpy as np
 from angle_emb import AnglE, Prompts
 from sentence_transformers import SentenceTransformer
 import os
+import torch
+
+# log and warning suppression
+import logging
+logging.getLogger('transformers').setLevel(logging.ERROR)
+logging.getLogger('sentence_transformers').setLevel(logging.ERROR)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 
 class EmbeddingGenerator():
@@ -10,19 +18,12 @@ class EmbeddingGenerator():
         self.name = f'{encoder}_{version}'
         os.makedirs(f'embeddings/{self.name}', exist_ok=True)
         if encoder == 'mpnet':
-            self.model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2').to(device)
+            model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2').to(device)
         elif encoder == 'UAE-Large-V1':
-            self.model = AnglE.from_pretrained('WhereIsAI/UAE-Large-V1', pooling_strategy='cls').to(device)
+            model = AnglE.from_pretrained('WhereIsAI/UAE-Large-V1', pooling_strategy='cls').to(device)
         # set the model to half precision
-        self.model = self.model.half()
-
-
-    def generate(self, wiki_loader):
-        # remove the existing embeddings
-        for file in os.listdir(f'embeddings/{self.name}'):
-            os.remove(f'embeddings/{self.name}/{file}')
-        for i, pages in enumerate(wiki_loader):
-            vec = self.model.encode(pages['text'])
-            print(f'Block {i}/{len(wiki_loader)} done')
-            np.save(f'embeddings/{self.name}/{i}.npy', vec)
+        self.model = torch.compile(model.half())
         
+    
+    def __call__(self, texts):
+        return self.model.encode(texts)
