@@ -51,11 +51,11 @@ class WikiDataset(Dataset):
         wiki_dict = self.__wiki_dict__(type)
         counter = 0
         indices = []
-        for file in glob.glob('wiki-pages/*.jsonl'):
+        for file in sorted(glob.glob('wiki-pages/*.jsonl')):
             with open(file, 'r') as f:
                 curr_file = jsonlist.load(f)
                 for page in curr_file:
-                    if page['id'] in wiki_dict:
+                    if unicodedata.normalize('NFC', page['id']) in wiki_dict:
                         indices.append(counter)
                     counter += 1
         with open(f'fever/{type}_reduced_indices.txt', mode='w') as f:
@@ -66,10 +66,9 @@ class WikiDataset(Dataset):
         wiki_dict = {}
         fever = FeverDataset(type)
         for statement in fever:
-            for evidences in statement['evidence']:
-                for evidence in evidences:
-                    if evidence[2] is not None:
-                        wiki_dict[unicodedata.normalize('NFC', evidence[2])] = wiki_dict.get(unicodedata.normalize('NFC', evidence[2]), []) + [statement['id']]
+            for evidence in statement['evidence']['all_evidence']:
+                if evidence is not None:
+                    wiki_dict[unicodedata.normalize('NFC', evidence[2])] = wiki_dict.get(unicodedata.normalize('NFC', evidence[2]), []) + [statement['id']]
         return wiki_dict
     
 
