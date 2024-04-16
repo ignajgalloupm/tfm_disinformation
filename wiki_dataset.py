@@ -68,7 +68,7 @@ class WikiDataset(Dataset):
         for statement in fever:
             for evidence in statement['evidence']['all_evidence']:
                 if evidence is not None:
-                    wiki_dict[unicodedata.normalize('NFC', evidence[2])] = wiki_dict.get(unicodedata.normalize('NFC', evidence[2]), []) + [statement['id']]
+                    wiki_dict[unicodedata.normalize('NFC', evidence)] = wiki_dict.get(unicodedata.normalize('NFC', evidence), []) + [statement['id']]
         return wiki_dict
     
 

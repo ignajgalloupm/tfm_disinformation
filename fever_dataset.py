@@ -21,15 +21,23 @@ class FeverDataset(Dataset):
             statement['evidence'] = {'all_evidence': self.__all_evidence__(evidence_sets), 
                                      'unique_evidence': self.__unique_non_supersets__(evidence_sets)}
         return data
-            
+    
     def __unique_non_supersets__(self, sets):
         unique_sets = []
-        for s1 in sets:
+        for i, s1 in enumerate(sets):
+            if s1 == {None}:
+                unique_sets.append(set())
+                continue
             is_superset = False
-            for s2 in sets:
-                if s1 != s2 and s1.issuperset(s2):
+            for s2 in sets[:i]:
+                if s1.issuperset(s2):
                     is_superset = True
                     break
+            if not is_superset:
+                for s2 in sets[i+1:]:
+                    if s1.issuperset(s2) and len(s1) > len(s2):
+                        is_superset = True
+                        break
             if not is_superset:
                 unique_sets.append(s1)
         return unique_sets
