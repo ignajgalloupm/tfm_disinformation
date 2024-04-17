@@ -9,6 +9,7 @@ import ast
 import json
 import random
 import multiprocessing
+import time
 
 TOTAL_WIKI_PAGES = 5416537
 PAGES_PER_FILE = 50000
@@ -34,11 +35,9 @@ class WikiDataset(Dataset):
             if num_extra_pages > 0:
                 ## add random extra pages using seed (must not already be in dataset)
                 random.seed(seed)
-                for _ in range(num_extra_pages):
-                    page = random.randint(0, TOTAL_WIKI_PAGES-1)
-                    while page in self.dataset:
-                        page = random.randint(0, TOTAL_WIKI_PAGES-1)
-                    self.dataset.append(page)
+                all_pages = set(range(TOTAL_WIKI_PAGES))
+                rest = all_pages - set(self.dataset)
+                self.dataset = self.dataset + random.sample(rest, num_extra_pages)
 
         else:
             self.dataset = [range(TOTAL_WIKI_PAGES)]

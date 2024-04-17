@@ -1,6 +1,7 @@
 import numpy as np
 from angle_emb import AnglE, Prompts
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
 import torch
 
@@ -19,12 +20,34 @@ class EmbeddingGenerator(torch.nn.Module):
         self.name = f'{encoder}_{version}'
         os.makedirs(f'embeddings/{self.name}', exist_ok=True)
         if encoder == 'mpnet':
-            model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2').to(device)
+            model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
         elif encoder == 'UAE-Large-V1':
-            model = AnglE.from_pretrained('WhereIsAI/UAE-Large-V1', pooling_strategy='cls').to(device)
+            model = SentenceTransformer('WhereIsAI/UAE-Large-V1')
+        else:
+            raise ValueError('Invalid encoder')
         # set the model to half precision
-        self.model = torch.compile(model.half())
+        self.model = model.half().to(device)
         
     
     def forward(self, texts):
-        return self.model.encode(texts)
+        return self.model.encode(texts, batch_size=128)
+    
+
+class NLI(torch.nn.Module):
+
+    def __init__(self, encoder='mpnet', version='v1', device='cuda'):
+        super(EmbeddingGenerator, self).__init__()
+        self.name = f'{encoder}_{version}'
+        os.makedirs(f'embeddings/{self.name}', exist_ok=True)
+        if encoder == 'mpnet':
+            self.tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
+            model = AutoModelForSequenceClassification.from_pretrained('sentence-transformers/all-mpnet-base-v2')
+        elif encoder == 'UAE-Large-V1':
+            self.tokenizer = AutoTokenizer.from_pretrained('WhereIsAI/UAE-Large-V1')
+            model = AutoModelForSequenceClassification.from_pretrained('WhereIsAI/UAE-Large-V1')
+        # set the model to half precision
+        self.model = model.half().to(device)
+        
+    
+    def forward(self, embeddings1, embeddings2):
+        return self.model(input_embeds=embeddings1)

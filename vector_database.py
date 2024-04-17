@@ -5,6 +5,7 @@ from embedding_generation import EmbeddingGenerator
 from qdrant_client.http import models
 import time
 import uuid
+import torch
 
 # log and warning suppression
 import logging
@@ -61,7 +62,7 @@ class VectorDatabase():
     def __uuid__(self, id):
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, id))
 
-        
+    @torch.no_grad()
     def __load_data__(self, pages, emb_gen):
         ids, texts = pages['id'], pages['text'] #, pages['lines']
         embeddings = emb_gen(texts)
