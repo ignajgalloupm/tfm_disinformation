@@ -1,5 +1,4 @@
 import numpy as np
-from angle_emb import AnglE, Prompts
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
@@ -36,7 +35,7 @@ class EmbeddingGenerator(torch.nn.Module):
 class NLI(torch.nn.Module):
 
     def __init__(self, encoder='mpnet', version='v1', device='cuda'):
-        super(EmbeddingGenerator, self).__init__()
+        super(NLI, self).__init__()
         self.name = f'{encoder}_{version}'
         os.makedirs(f'embeddings/{self.name}', exist_ok=True)
         if encoder == 'mpnet':
@@ -49,5 +48,6 @@ class NLI(torch.nn.Module):
         self.model = model.half().to(device)
         
     
-    def forward(self, embeddings1, embeddings2):
-        return self.model(input_embeds=embeddings1)
+    def forward(self, embeddings):
+        probs = torch.nn.functional.softmax(self.model(inputs_embeds=embeddings).logits, dim=-1)
+        return probs
