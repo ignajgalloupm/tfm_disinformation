@@ -43,10 +43,10 @@ class FeverDataset(Dataset):
         return unique_sets
     
     def __all_evidence__(self, sets):
-        all_evidence = []
+        all_evidence = set()
         for s in sets:
-            all_evidence.extend(list(s))
-        return all_evidence
+            all_evidence = all_evidence.union(s)
+        return list(all_evidence)
         
 
     def __len__(self):            

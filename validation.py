@@ -24,6 +24,8 @@ class Validation:
 
     # performs a single validation step
     def valid_step(self, input_batch):
+        batch_size = len(input_batch['claims'])
+
         # get embeddings of the claims
         with torch.no_grad():
             outputs = self.emb_gen(input_batch['claims'])
@@ -32,10 +34,10 @@ class Validation:
         similar_pages = self.vdb.search_similar(outputs, PAGES_RETRIEVED)
         #print(similar_pages)
         similar_texts = [[t.payload['text'] for t in s] for s in similar_pages]
-        similar_ids = [[t.payload['id'] for t in s[:PAGES_FOR_EVIDENCE]] for s in similar_pages]
+        similar_ids = [[t.payload['id'] for t in s] for s in similar_pages]
         similar_embeds = [[t.vector for t in s] for s in similar_pages]
 
-        target_changes, precentage_retrieved = get_target_changes(input_batch, similar_ids)
+        target_changes, precentage_retrieved = get_target_changes(input_batch, similar_ids, PAGES_FOR_EVIDENCE))
         targets = [v == 'VERIFIABLE' for v in input_batch['verifiable']]
 
         # dinamically change the target
@@ -43,21 +45,19 @@ class Validation:
         targets = [t and tc for t, tc in zip(targets, target_changes)]
         #---------------------------------- only training
 
-        all_evidence = [r['all_evidence'] for r in input_batch['evidence']]
-        evidence_pages = self.vdb.search_ids(all_evidence)
+        all_evidence = [r['all_evidence'] if r['all_evidence'] != [None] else [] for r in input_batch['evidence']]
+        evidence_pages = [self.vdb.search_ids(all_evidence[i]) for i in range(batch_size)]
         evidence_texts = [[t.payload['text'] for t in s] for s in evidence_pages]
         # pick as negative examples the texts of the last len(evidence_texts) of the 50 retrieved pages
         negative_examples = get_negative_examples(similar_texts, similar_ids, all_evidence)
 
         # combine the positive and negative examples
-        combined_texts = [s + n for s, n in zip(similar_texts, negative_examples)]
+        combined_texts = [s + n for s, n in zip(evidence_texts, negative_examples)]
 
         # encode the combined texts in batches
-        len_batch = len(input_batch['claims'])
-
-        for i in range(0, len(combined_texts), len_batch):
+        for i in range(0, len(combined_texts), batch_size):
             with torch.no_grad():
-                combined_embeddings = self.emb_gen(combined_texts[i:i+len_batch])
+                combined_embeddings = self.emb_gen(combined_texts[i:i+batch_size])
             if i == 0:
                 combined_embeds = combined_embeddings
             else:
@@ -65,7 +65,7 @@ class Validation:
 
 
         # create the label tensor, half of the labels are 1 and half are 0
-
+        labels = torch.cat([torch.ones(batch_size), torch.zeros(batch_size)]).to(self.device)
 
 
         loss1 = self.loss_fn1(outputs, similar_embeds)
