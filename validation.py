@@ -28,74 +28,78 @@ class Validation:
 
         # get embeddings of the claims
         with torch.no_grad():
-            outputs = self.emb_gen(input_batch['claims'])
+            outputs = emb_gen(input_batch['claims'])
 
         # search for similar pages
-        similar_pages = self.vdb.search_similar(outputs, PAGES_RETRIEVED)
+        similar_pages = vdb.search_similar(outputs, PAGES_RETRIEVED)
         #print(similar_pages)
         similar_texts = [[t.payload['text'] for t in s] for s in similar_pages]
         similar_ids = [[t.payload['id'] for t in s] for s in similar_pages]
-        similar_embeds = [[t.vector for t in s] for s in similar_pages]
+        similar_embeds = [[t.vector for t in s[:PAGES_FOR_EVIDENCE]] for s in similar_pages]
 
-        target_changes, precentage_retrieved = get_target_changes(input_batch, similar_ids, PAGES_FOR_EVIDENCE))
-        targets = [v == 'VERIFIABLE' for v in input_batch['verifiable']]
+        target_changes, precentage_retrieved = get_target_changes(input_batch, similar_ids, PAGES_FOR_EVIDENCE)
+        nli_targets = [v == 'VERIFIABLE' for v in input_batch['verifiable']]
 
         # dinamically change the target
         #---------------------------------- only training
-        targets = [t and tc for t, tc in zip(targets, target_changes)]
+        nli_targets = [int(t and tc) for t, tc in zip(nli_targets, target_changes)]
         #---------------------------------- only training
 
         all_evidence = [r['all_evidence'] if r['all_evidence'] != [None] else [] for r in input_batch['evidence']]
-        evidence_pages = [self.vdb.search_ids(all_evidence[i]) for i in range(batch_size)]
+        evidence_pages = [vdb.search_ids(all_evidence[i]) for i in range(batch_size)]
         evidence_texts = [[t.payload['text'] for t in s] for s in evidence_pages]
         # pick as negative examples the texts of the last len(evidence_texts) of the 50 retrieved pages
         negative_examples = get_negative_examples(similar_texts, similar_ids, all_evidence)
 
-        # combine the positive and negative examples
-        combined_texts = [s + n for s, n in zip(evidence_texts, negative_examples)]
-
+        # combine all the batches
+        unfolded_outputs = []
+        unfolded_combined_texts = []
+        unfolded_labels = []
+        for i in range(batch_size):
+            unfolded_outputs.extend([outputs[i]] * len(evidence_texts[i] + negative_examples[i]))
+            unfolded_combined_texts.extend(evidence_texts[i] + negative_examples[i])
+            unfolded_labels.extend([1] * len(evidence_texts[i]) + [0] * len(negative_examples[i]))
+        
         # encode the combined texts in batches
-        for i in range(0, len(combined_texts), batch_size):
+        combined_embeddings = []
+        for i in range(0, len(unfolded_combined_texts), batch_size):
             with torch.no_grad():
-                combined_embeddings = self.emb_gen(combined_texts[i:i+batch_size])
-            if i == 0:
-                combined_embeds = combined_embeddings
-            else:
-                combined_embeds = torch.cat([combined_embeds, combined_embeddings], dim=0)
+                combined_embeddings.extend(emb_gen(unfolded_combined_texts[i:i+batch_size]))
 
+        combined_embeddings = torch.tensor(combined_embeddings).to(device)
+        unfolded_outputs = torch.tensor(unfolded_outputs).to(device)
+        unfolded_labels = torch.tensor(unfolded_labels).to(device)
 
-        # create the label tensor, half of the labels are 1 and half are 0
-        labels = torch.cat([torch.ones(batch_size), torch.zeros(batch_size)]).to(self.device)
-
-
-        loss1 = self.loss_fn1(outputs, similar_embeds)
-
-
-
+        loss1 = loss_fn1(combined_embeddings, unfolded_outputs, unfolded_labels)
+        print(loss1)
 
 
         # input for the NLI model
-        outputs = torch.tensor(outputs).unsqueeze(1).to(self.device)
-        similar_embeds = torch.tensor(similar_embeds).to(self.device)
+        outputs = torch.tensor(outputs).unsqueeze(1).to(device)
+        similar_embeds = torch.tensor(similar_embeds).to(device)
 
         # concat the output of the embedding generator
-        nli_inputs = torch.cat([outputs, similar_embeds[::PAGES_FOR_EVIDENCE]], dim=1)
+        nli_inputs = torch.cat([outputs, similar_embeds], dim=1)
 
         with torch.no_grad():
-            outputs = self.nli(nli_inputs.half())
+            nli_outputs = nli(nli_inputs.half())
         
-        preds = torch.argmax(outputs, dim=1)
-        targets = torch.tensor(targets).to(self.device)
+        preds = torch.argmax(nli_outputs, dim=1)
+        targets = torch.tensor(nli_targets).half().to(device)
+
+        # nli_outputs is 32,2 keep only the 1
+        nli_outputs = nli_outputs[:, 1]
 
         # Convert lists of tensors to tensors
-        loss = self.loss_fn(outputs.squeeze(), targets.to(self.device))
+        loss2 = loss_fn2(nli_outputs, targets)
+        print(loss2)
 
         # calculate the f1 score, we apply a sigmoid to the output if the loss function is BCEWithLogitsLoss
-        if self.loss_fn.__class__.__name__ == 'BCEWithLogitsLoss':
-            outputs = torch.sigmoid(outputs)
-        outputs = outputs.detach().cpu().numpy()
+        if loss_fn2.__class__.__name__ == 'BCEWithLogitsLoss':
+            nli_outputs = torch.sigmoid(nli_outputs)
+        nli_outputs = nli_outputs.detach().cpu().numpy()
         targets = targets.detach().cpu().numpy()
-        f1 = f1_score(targets, (outputs > 0.5).astype(int), average='macro')
+        f1 = f1_score(targets, (nli_outputs > 0.5).astype(int), average='macro')
 
         return {'preds': preds, 'targets': targets, 'target_changes': target_changes, 'precentage_retrieved': precentage_retrieved}
 
