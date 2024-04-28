@@ -48,6 +48,34 @@ class VectorDatabase():
                 self.client.create_collection(
                     collection_name=self.collection,
                     vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+                    hnsw_config=models.HnswConfigDiff(
+                        ef_construct=100,
+                        m=16,
+                        max_indexing_threads=0,
+                        full_scan_threshold=10000,
+                        on_disk=True,
+                    ),
+                    optimizers_config=models.OptimizersConfigDiff(
+                        deleted_threshold=0.2,
+                        vacuum_min_vector_number=1000,
+                        default_segment_number=0,
+                        max_segment_size=None,
+                        memmap_threshold=20000,
+                        indexing_threshold=20000,
+                        flush_interval_sec=5,
+                        max_optimization_threads=None,
+                    ),
+                    wal_config=models.WalConfigDiff(
+                        wal_capacity_mb=32,
+                        wal_segments_ahead=0,
+                    ),
+                    quantization_config=models.ScalarQuantization(
+                        scalar=models.ScalarQuantizationConfig(
+                            type=models.ScalarType.INT8,
+                            always_ram=False,
+                        ),
+                    ),
+                    on_disk_payload=True,
                 )
             self.client.upload_points(
                 collection_name=self.collection,
@@ -72,16 +100,16 @@ class VectorDatabase():
         return data, vector_size
 
 
-    def search_similar(self, queries, top=10):
+    def search_similar(self, queries, top=10, with_payload=False, with_vector=False):
         collection_names = [collection.name for collection in self.client.get_collections().collections]
 
         if self.collection not in collection_names:
             raise Exception('Collection does not exist')
         
-        search_queries = [models.SearchRequest(vector=queries[i], limit=top, with_payload=True, with_vector=True) for i in range(len(queries))]
+        search_queries = [models.SearchRequest(vector=queries[i], limit=top, with_payload=with_payload, with_vector=with_vector) for i in range(len(queries))]
         return self.client.search_batch(collection_name=self.collection, requests=search_queries)
     
     
     def search_ids(self, ids):
         ids = [self.__uuid__(id) for id in ids]
-        return self.client.retrieve(collection_name=self.collection, ids=ids, with_payload=True, with_vectors=True)
+        return self.client.retrieve(collection_name=self.collection, ids=ids, with_payload=True, with_vectors=False)

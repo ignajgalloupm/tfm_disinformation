@@ -1,5 +1,6 @@
 import jsonlist
-from torch.utils.data import Dataset, default_collate
+from torch.utils.data import Dataset
+import unicodedata
 
 
 class FeverDataset(Dataset):
@@ -16,7 +17,7 @@ class FeverDataset(Dataset):
             for evidences in statement['evidence']:
                 set2 = set()
                 for evidence in evidences:
-                    set2.add(evidence[2])
+                    set2.add(unicodedata.normalize('NFC', evidence[2]) if evidence[2] is not None else None)
                 evidence_sets.append(set2)
             statement['evidence'] = {'all_evidence': self.__all_evidence__(evidence_sets), 
                                      'unique_evidence': self.__unique_non_supersets__(evidence_sets)}

@@ -9,7 +9,6 @@ import ast
 import json
 import random
 import multiprocessing
-import time
 
 TOTAL_WIKI_PAGES = 5416537
 PAGES_PER_FILE = 50000
@@ -67,7 +66,7 @@ class WikiDataset(Dataset):
         for statement in fever:
             for evidence in statement['evidence']['all_evidence']:
                 if evidence is not None:
-                    wiki_dict[unicodedata.normalize('NFC', evidence)] = wiki_dict.get(unicodedata.normalize('NFC', evidence), []) + [statement['id']]
+                    wiki_dict[evidence] = wiki_dict.get(evidence, []) + [statement['id']]
         return wiki_dict
     
 
