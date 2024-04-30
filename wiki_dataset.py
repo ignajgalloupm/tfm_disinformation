@@ -15,19 +15,15 @@ PAGES_PER_FILE = 50000
 
 
 class WikiDataset(Dataset):
-    def __init__(self, in_mem=False, reduced=True, type='train', num_extra_pages=0, seed=None):
+    def __init__(self, in_mem=False, reduced=True, num_extra_pages=0, seed=None):
         self.in_mem = in_mem
-
-        if type not in ['train', 'dev', 'test']:
-            raise ValueError('type must be one of: train, dev, test')
-        
         self.dataset = []
         if reduced:
             # chech if file fever/reduced_indices.txt exists
-            if not os.path.isfile(f'fever/{type}_reduced_indices.txt'):
+            if not os.path.isfile(f'fever/reduced_indices.txt'):
                 # if it does not exist, create it
-                self.__create_reduced_indices__(type)
-            with open(f'fever/{type}_reduced_indices.txt') as f:
+                self.__create_reduced_indices__()
+            with open(f'fever/reduced_indices.txt') as f:
                 indices = f.read()
                 # keep in self.dataset only the pages that are in indices
                 self.dataset = ast.literal_eval(indices)
@@ -45,8 +41,8 @@ class WikiDataset(Dataset):
             self.dataset = self.__to_mem__(self.dataset)
 
 
-    def __create_reduced_indices__(self, type):
-        wiki_dict = self.__wiki_dict__(type)
+    def __create_reduced_indices__(self):
+        wiki_dict = self.__wiki_dict__()
         counter = 0
         indices = []
         for file in sorted(glob.glob('wiki-pages/*.jsonl')):
@@ -56,13 +52,18 @@ class WikiDataset(Dataset):
                     if unicodedata.normalize('NFC', page['id']) in wiki_dict:
                         indices.append(counter)
                     counter += 1
-        with open(f'fever/{type}_reduced_indices.txt', mode='w') as f:
+        with open(f'fever/reduced_indices.txt', mode='w') as f:
             f.write(str(indices))
     
 
-    def __wiki_dict__(self, type):
+    def __wiki_dict__(self):
         wiki_dict = {}
-        fever = FeverDataset(type)
+        fever = FeverDataset('train')
+        for statement in fever:
+            for evidence in statement['evidence']['all_evidence']:
+                if evidence is not None:
+                    wiki_dict[evidence] = wiki_dict.get(evidence, []) + [statement['id']]
+        fever = FeverDataset('dev')
         for statement in fever:
             for evidence in statement['evidence']['all_evidence']:
                 if evidence is not None:

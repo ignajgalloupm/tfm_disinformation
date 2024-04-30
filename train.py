@@ -1,7 +1,6 @@
-import torch
 from other_utils import print_progress
 from train_eval_utils import get_metrics, nli_step, emb_gen_step
-
+from torch.cuda.amp import autocast
 
 
 
@@ -17,6 +16,7 @@ class Train:
 
 
     # performs a single validation step
+    @autocast()
     def train_step(self, input_batch, vdb, emb_gen, nli):
         outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, loss1 = emb_gen_step(input_batch, vdb, emb_gen, self.loss_fn1, self.device)
         

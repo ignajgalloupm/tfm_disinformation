@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
 import torch
+from torch.cuda.amp import autocast
 
 
 PAGES_RETRIEVED = 50
@@ -38,7 +39,7 @@ def get_negative_examples(similar_texts, similar_ids, all_evidence):
         negative_examples.append(n[:len(all_evidence[i])])
     return negative_examples
 
-
+@autocast()
 def emb_gen_step(input_batch, vdb, emb_gen, loss_fn1, device):
     batch_size = len(input_batch['claims'])
 
@@ -83,14 +84,14 @@ def emb_gen_step(input_batch, vdb, emb_gen, loss_fn1, device):
     for i in range(0, len(unfolded_combined_texts), batch_size):
         combined_embeddings.extend(emb_gen(unfolded_combined_texts[i:i+batch_size]))
 
-    combined_embeddings = torch.cat(combined_embeddings, dim=0).view([-1, EMBEDDING_SIZE])
-    unfolded_outputs = torch.cat(unfolded_outputs, dim=0).view([-1, EMBEDDING_SIZE])
+    combined_embeddings = torch.stack(combined_embeddings)
+    unfolded_outputs = torch.stack(unfolded_outputs)
     unfolded_labels = torch.tensor(np.array(unfolded_labels)).to(device)
 
     loss1 = loss_fn1(combined_embeddings, unfolded_outputs, unfolded_labels)
     return outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, loss1
 
-
+@autocast()
 def nli_step(vdb, nli, outputs, dynamic_nli_targets, loss_fn2, device):
     similar_embeddings = vdb.search_similar(outputs, PAGES_FOR_EVIDENCE, with_vector=True)
     # input for the NLI model
@@ -106,8 +107,7 @@ def nli_step(vdb, nli, outputs, dynamic_nli_targets, loss_fn2, device):
     preds = torch.argmax(nli_outputs, dim=1).cpu().numpy()
     targets = torch.tensor(dynamic_nli_targets, dtype=torch.float32).to(device)
 
-    # nli_outputs is 32,2 keep only the 1
-    nli_outputs = nli_outputs[:, 1]
+    nli_outputs = nli_outputs.squeeze()
 
     # Convert lists of tensors to tensors
     loss2 = loss_fn2(nli_outputs, targets)

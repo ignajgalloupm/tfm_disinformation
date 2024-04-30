@@ -29,8 +29,7 @@ class VectorDatabase():
             self.__start_collection__(wiki_loader, emb_gen, version)
         else:
             raise Exception('Invalid client type')
-
-        
+       
 
     def __start_collection__(self, wiki_loader, emb_gen, version):
         print('Creating collection')
