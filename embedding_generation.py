@@ -77,7 +77,9 @@ class EmbeddingGenerator(torch.nn.Module):
     #             # Perform pooling
     #             sentence_embeddings = self.__mean_pooling_normalization__(model_output, encoded_input['attention_mask'])
     #             encodes.extend([e for e in sentence_embeddings])
-    #         encodes = [encodes[i] for i in indices]
+    #         # reorder the embeddings to the original order, indices indicate the original position of the embeddings
+    #         _, inverse_indices = torch.sort(torch.tensor(indices))
+    #         encodes = [encodes[i] for i in inverse_indices]
     #         output = torch.stack(encodes)
     #     else:
     #         encoded_input = self.tokenizer(texts, padding=True, truncation=True, return_tensors='pt').to(self.device)
@@ -89,11 +91,10 @@ class EmbeddingGenerator(torch.nn.Module):
  
     @autocast()
     def forward(self, texts):   
-        encoded_input = self.tokenizer(texts, padding='max_length', truncation=True, return_tensors='pt')
-        input_ids = encoded_input['input_ids']
-        attention_mask = encoded_input['attention_mask']
-        
         if len(texts) > self.batch_size:
+            encoded_input = self.tokenizer(texts, padding='max_length', truncation=True, return_tensors='pt')
+            input_ids = encoded_input['input_ids']
+            attention_mask = encoded_input['attention_mask']
             # sort the texts by length but keep the original order
             lengths = torch.sum(attention_mask, dim=1)
             #input_ids, attention_mask, indices = sort_with_index(input_ids, attention_mask, lengths)
@@ -109,26 +110,27 @@ class EmbeddingGenerator(torch.nn.Module):
             
                 # cut the unnecessary padding
                 max_length = torch.max(torch.sum(at_mask, dim=1)).item()
-                in_ids = in_ids[:, :max_length].to(self.device)
-                at_mask = at_mask[:, :max_length].to(self.device)
+                
+                in_ids = in_ids[:, :max_length].detach().to(self.device)
+                at_mask = at_mask[:, :max_length].detach().to(self.device)
 
-            
                 # Compute token embeddings
                 model_output = self.model(input_ids=in_ids, attention_mask=at_mask)
                 # Perform pooling and normalization
                 sentence_embeddings = self.__mean_pooling_normalization__(model_output, at_mask)
                 encodes.extend([e for e in sentence_embeddings])
-            # reorder the embeddings to the original order
-            encodes = [encodes[i] for i in indices]
+            # reorder the embeddings to the original order, indices indicate the original position of the embeddings
+            _, inverse_indices = torch.sort(indices)
+            encodes = [encodes[i] for i in inverse_indices]
             output = torch.stack(encodes)
 
         else:
             # Compute token embeddings
-            in_ids = input_ids.to(self.device)
-            at_mask = attention_mask.to(self.device)
-            model_output = self.model(input_ids=in_ids, attention_mask=at_mask)
+            encoded_input = self.tokenizer(texts, padding=True, truncation=True, return_tensors='pt').to(self.device)
+            # Compute token embeddings
+            model_output = self.model(**encoded_input)
             # Perform pooling and normalization
-            output = self.__mean_pooling_normalization__(model_output, at_mask)
+            output = self.__mean_pooling_normalization__(model_output, encoded_input['attention_mask'])
         return output
     
     #Mean Pooling - Take attention mask into account for correct averaging
@@ -158,3 +160,6 @@ class NLI(torch.nn.Module):
     def forward(self, embeddings):
         probs = self.model(inputs_embeds=embeddings).logits
         return probs
+
+
+    

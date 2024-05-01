@@ -6,11 +6,12 @@ from torch.cuda.amp import autocast
 
 class Validation:
 
-    def __init__(self, device, eval_loader, loss_fn1, loss_fn2, model_name):
+    def __init__(self, device, eval_loader, loss_fn1, loss_fn2, B, model_name):
         self.device = device
         self.eval_loader = eval_loader
         self.loss_fn1 = loss_fn1
         self.loss_fn2 = loss_fn2
+        self.B = B
         self.model_name = model_name
 
 
@@ -20,12 +21,14 @@ class Validation:
     def valid_step(self, input_batch, vdb, emb_gen, nli):
         outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, loss1 = emb_gen_step(input_batch, vdb, emb_gen, self.loss_fn1, self.device)
         preds, loss2 = nli_step(vdb, nli, outputs, dynamic_nli_targets, self.loss_fn2, self.device)
+        total_loss = self.B*loss1 + (1-self.B)*loss2
         result = {'preds': preds, 
                 'original_labels': original_nli_targets, 
                 'dynamic_labels': dynamic_nli_targets, 
                 'percentage_retrieved': percentage_retrieved,
                 'loss1': loss1.item(),
-                'loss2': loss2.item()}
+                'loss2': loss2.item(),
+                'total_loss': total_loss.item()}
         return result
         
 

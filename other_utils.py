@@ -24,6 +24,7 @@ def print_tracker(tracking, set_name, ma_ratio=None):
     average_total_retrieved = np.array(tracking['average_total_retrieved'])
     loss1 = np.array(tracking['average_loss1'])
     loss2 = np.array(tracking['average_loss2'])
+    total_loss = np.array(tracking['average_total_loss'])
 
     # smooth everything with a moving average
     if ma_ratio is not None:
@@ -37,13 +38,14 @@ def print_tracker(tracking, set_name, ma_ratio=None):
             average_total_retrieved = np.convolve(average_total_retrieved, np.ones((ma_size,))/ma_size, mode='valid')
             loss1 = np.convolve(loss1, np.ones((ma_size,))/ma_size, mode='valid')
             loss2 = np.convolve(loss2, np.ones((ma_size,))/ma_size, mode='valid')
+            total_loss = np.convolve(total_loss, np.ones((ma_size,))/ma_size, mode='valid')
 
     # plot the metrics
     plt.figure(figsize=(10, 5))
     plt.title('Loss for ' + set_name + ' Set')
     plt.plot(loss1, label='Loss 1')
     plt.plot(loss2, label='Loss 2')
-    plt.plot(loss1 + loss2, label='Total Loss')
+    plt.plot(total_loss, label='Total Loss')
     plt.legend()
     plt.show()
     plt.figure(figsize=(10, 5))

@@ -17,8 +17,15 @@ PAGES_PER_FILE = 50000
 class WikiDataset(Dataset):
     def __init__(self, in_mem=False, reduced=True, num_extra_pages=0, seed=None):
         self.in_mem = in_mem
+        self.reduced = reduced
+        self.num_extra_pages = num_extra_pages
+        self.seed = seed
+        self.__initialization__()
+
+    def __initialization__(self):
+        # rebuild the dataset with different random extra pages
         self.dataset = []
-        if reduced:
+        if self.reduced:
             # chech if file fever/reduced_indices.txt exists
             if not os.path.isfile(f'fever/reduced_indices.txt'):
                 # if it does not exist, create it
@@ -27,17 +34,17 @@ class WikiDataset(Dataset):
                 indices = f.read()
                 # keep in self.dataset only the pages that are in indices
                 self.dataset = ast.literal_eval(indices)
-            if num_extra_pages > 0:
+            if self.num_extra_pages > 0:
                 ## add random extra pages using seed (must not already be in dataset)
-                random.seed(seed)
+                random.seed(self.seed)
                 all_pages = set(range(TOTAL_WIKI_PAGES))
                 rest = all_pages - set(self.dataset)
-                self.dataset = self.dataset + random.sample(rest, num_extra_pages)
+                self.dataset = self.dataset + random.sample(rest, self.num_extra_pages)
 
         else:
             self.dataset = [range(TOTAL_WIKI_PAGES)]
-        
-        if in_mem:
+
+        if self.in_mem:
             self.dataset = self.__to_mem__(self.dataset)
 
 
@@ -116,3 +123,7 @@ class WikiDataset(Dataset):
             return index
         else: 
             return self.__getitem_fom_disk__(index)
+        
+
+    def refresh(self):
+        self.__initialization__()

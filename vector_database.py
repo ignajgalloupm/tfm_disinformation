@@ -15,27 +15,35 @@ PAGES_PER_FILE = 50000
 
 class VectorDatabase():
 
-    def __init__(self, wiki_loader, emb_gen, client='local', ip='localhost', port=6333, version='v1'):
-        self.collection = f'{version}'
-        if client == 'local':
-            self.client = QdrantClient(':memory:')
-            self.__start_collection__(wiki_loader, emb_gen, version)
+    def __init__(self, wiki_loader, emb_gen, host='local', ip='localhost', port=6333, version='v1'):
+        self.collection = version
+        self.wiki_loader = wiki_loader
+        self.host = host
+        self.ip = ip
+        self.port = port
 
-        elif client == 'docker':
-            self.client = QdrantClient(f'{ip}:{port}')
+        self.__initialization__(emb_gen)
+        
+    
+    def __initialization__(self, emb_gen):
+        if self.host == 'local':
+            self.client = QdrantClient(':memory:')
+            self.__start_collection__(emb_gen)
+        elif self.host == 'docker':
+            self.client = QdrantClient(f'{self.ip}:{self.port}')
             if self.collection in [c.name for c in self.client.get_collections().collections]:
                 ## delete collection
                 self.client.delete_collection(collection_name=self.collection)
-            self.__start_collection__(wiki_loader, emb_gen, version)
+            self.__start_collection__(emb_gen)
         else:
-            raise Exception('Invalid client type')
-       
+            raise Exception('Invalid host type' + self.host)
 
-    def __start_collection__(self, wiki_loader, emb_gen, version):
+
+    def __start_collection__(self, emb_gen):
         print('Creating collection')
         init = time.time()
         emb_gen.eval()
-        for i, pages in enumerate(wiki_loader):
+        for i, pages in enumerate(self.wiki_loader):
             data, vector_size = self.__load_data__(pages, emb_gen)
             if i == 0:
                 self.client.create_collection(
@@ -76,7 +84,7 @@ class VectorDatabase():
                 parallel=2,
                 max_retries=3,
             )
-            print(f'Block {i+1}/{len(wiki_loader)} done')
+            print(f'Block {i+1}/{len(self.wiki_loader)} done')
         print('Time to create collection:', time.time() - init)
 
 
@@ -91,8 +99,13 @@ class VectorDatabase():
         data = [PointStruct(id=self.__uuid__(id), vector=embeddings[j], payload={'id': id,'text': text}) 
                 for j, id, text in zip(range(num_pages), ids, texts)] #, "lines": lines
         return data, vector_size
+    
 
+    def refresh(self, emb_gen):
+        self.wiki_loader.dataset.refresh()
+        self.__initialization__(emb_gen)
 
+        
     def search_similar(self, queries, top=10, with_payload=False, with_vector=False):
         collection_names = [collection.name for collection in self.client.get_collections().collections]
 
