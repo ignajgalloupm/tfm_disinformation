@@ -142,24 +142,65 @@ class EmbeddingGenerator(torch.nn.Module):
 
     
 
+# class NLI(torch.nn.Module):
+
+#     def __init__(self, encoder='mpnet', version='v1', device='cuda'):
+#         super(NLI, self).__init__()
+#         self.name = f'{encoder}_{version}'
+#         os.makedirs(f'embeddings/{self.name}', exist_ok=True)
+#         if encoder == 'mpnet':
+#             model = AutoModelForSequenceClassification.from_pretrained('sentence-transformers/all-mpnet-base-v2', num_labels=1)
+#         elif encoder == 'UAE-Large-V1':
+#             model = AutoModelForSequenceClassification.from_pretrained('WhereIsAI/UAE-Large-V1', num_labels=1)
+#         # set the model to half precision
+#         self.model = model.to(device)
+        
+#     def forward(self, embeddings):
+#         probs = self.model(inputs_embeds=embeddings).logits
+#         return probs
+
+
+
+# 0.70
 class NLI(torch.nn.Module):
 
     def __init__(self, encoder='mpnet', version='v1', device='cuda'):
         super(NLI, self).__init__()
-        self.name = f'{encoder}_{version}'
-        os.makedirs(f'embeddings/{self.name}', exist_ok=True)
-        if encoder == 'mpnet':
-            self.tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
-            model = AutoModelForSequenceClassification.from_pretrained('sentence-transformers/all-mpnet-base-v2', num_labels=1)
-        elif encoder == 'UAE-Large-V1':
-            self.tokenizer = AutoTokenizer.from_pretrained('WhereIsAI/UAE-Large-V1')
-            model = AutoModelForSequenceClassification.from_pretrained('WhereIsAI/UAE-Large-V1', num_labels=1)
-        # set the model to half precision
-        self.model = model.to(device)
-        
+        # input is batch_size x 11 x 768
+        self.c1 = torch.nn.Linear(768*2, 600).to(device)
+        self.c2 = torch.nn.Linear(600, 400).to(device)
+        self.c3 = torch.nn.Linear(400, 300).to(device)
+
+        self.l1 = torch.nn.Linear(300*10, 1500).to(device)
+        self.l2 = torch.nn.Linear(1500, 1000).to(device)
+        self.l3 = torch.nn.Linear(1000, 400).to(device)
+        self.l4 = torch.nn.Linear(400, 100).to(device)
+        self.l5 = torch.nn.Linear(100, 1).to(device)
+
+        self.lnorm = torch.nn.LayerNorm(1500).to(device)
+        self.dropout = torch.nn.Dropout(0.15).to(device)
+
+
     def forward(self, embeddings):
-        probs = self.model(inputs_embeds=embeddings).logits
-        return probs
 
+        # pair every embedding with the first one
+        pairs = torch.cat([embeddings[:, 0].unsqueeze(1).repeat(1, 10, 1), embeddings[:, 1:]], dim=2)
 
+        c1 = self.c1(pairs)
+        c1 = F.leaky_relu(c1)
+        c2 = self.c2(c1)
+        c2 = F.leaky_relu(c2)
+        c3 = self.c3(c2)
+        c3 = F.leaky_relu(c3)
+
+        l1 = self.l1(c3.view(c3.shape[0], -1))
+        l1 = F.leaky_relu(self.lnorm(l1))
+        l2 = self.l2(l1)
+        l2 = F.leaky_relu(self.dropout(l2))
+        l3 = self.l3(l2)
+        l3 = F.leaky_relu(l3)
+        l4 = self.l4(l3)
+        l4 = F.leaky_relu(l4)
+        l5 = self.l5(l4)
+        return l5
     

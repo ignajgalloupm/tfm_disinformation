@@ -30,7 +30,7 @@ def get_target_changes(evidence, similar_ids, pages_for_evidence=10):
 
 
 def cap_max_evidences(evidence_texts, max_evidences):
-    print('Total evidences in batch:', sum([len(e) for e in evidence_texts]), 'will be capped to:', max_evidences * len(evidence_texts), 'evidences')
+    #print('Total evidences in batch:', sum([len(e) for e in evidence_texts]), 'will be capped to:', max_evidences * len(evidence_texts), 'evidences')
     # if the sum of the lengths of the evidence texts is less than max_evidences, return all the texts
     if sum([len(e) for e in evidence_texts]) <= max_evidences * len(evidence_texts):
         return evidence_texts
@@ -61,11 +61,10 @@ def get_negative_examples(similar_texts, similar_ids, all_evidence):
 def emb_gen_step(input_batch, vdb, emb_gen, loss_fn1, device):
     batch_size = len(input_batch['claims'])
 
-    all_evidence = [r['all_evidence'] if r['all_evidence'] != [None] else [] for r in input_batch['evidence']]
-    evidence_pages = [vdb.search_ids(all_evidence[i]) for i in range(batch_size)]
-    evidence_texts = [[t.payload['text'] for t in s] for s in evidence_pages]
-    evidence_texts = cap_max_evidences(evidence_texts, max_evidences=MAX_EVIDENCES)
-
+    # all_evidence = [r['all_evidence'] if r['all_evidence'] != [None] else [] for r in input_batch['evidence']]
+    # evidence_pages = [vdb.search_ids(all_evidence[i]) for i in range(batch_size)]
+    # evidence_texts = [[t.payload['text'] for t in s] for s in evidence_pages]
+    # evidence_texts = cap_max_evidences(evidence_texts, max_evidences=MAX_EVIDENCES)
 
     # get embeddings of the claims
     outputs = emb_gen(input_batch['claims'])
@@ -80,35 +79,37 @@ def emb_gen_step(input_batch, vdb, emb_gen, loss_fn1, device):
 
     
     # pick as negative examples the texts of the last len(evidence_texts) of the 50 retrieved pages
-    negative_examples = get_negative_examples(similar_texts, similar_ids, all_evidence)
+    # negative_examples = get_negative_examples(similar_texts, similar_ids, all_evidence)
 
     target_changes, percentage_retrieved = get_target_changes(input_batch['evidence'], similar_ids, PAGES_FOR_EVIDENCE)
     original_nli_targets = [int(v == 'SUPPORTS') for v in input_batch['label']]
     dynamic_nli_targets = [int(t and tc) for t, tc in zip(original_nli_targets, target_changes)]
 
-    # check if there is at least one element in the batch with some evidence
-    if all([len(e) == 0 for e in all_evidence]):
-        return outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, torch.tensor(0.0).to(device)
+    # # check if there is at least one element in the batch with some evidence
+    # if all([len(e) == 0 for e in all_evidence]):
+    #     return outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, torch.tensor(0.0).to(device)
 
-    # combine all the batches
-    unfolded_outputs = []
-    unfolded_combined_texts = []
-    unfolded_labels = []
-    for i in range(batch_size):
-        unfolded_outputs.extend([outputs[i]] * len(evidence_texts[i] + negative_examples[i]))
-        unfolded_combined_texts.extend(evidence_texts[i] + negative_examples[i])
-        unfolded_labels.extend([1] * len(evidence_texts[i]) + [-1] * len(negative_examples[i]))
+    # # combine all the batches
+    # unfolded_outputs = []
+    # unfolded_combined_texts = []
+    # unfolded_labels = []
+    # for i in range(batch_size):
+    #     unfolded_outputs.extend([outputs[i]] * len(evidence_texts[i] + negative_examples[i]))
+    #     unfolded_combined_texts.extend(evidence_texts[i] + negative_examples[i])
+    #     unfolded_labels.extend([1] * len(evidence_texts[i]) + [-1] * len(negative_examples[i]))
     
-    # encode the combined texts in batches
-    combined_embeddings = []
-    for i in range(0, len(unfolded_combined_texts), batch_size):
-        combined_embeddings.extend(emb_gen(unfolded_combined_texts[i:i+batch_size]))
+    # # encode the combined texts in batches
+    # combined_embeddings = []
+    # for i in range(0, len(unfolded_combined_texts), batch_size):
+    #     combined_embeddings.extend(emb_gen(unfolded_combined_texts[i:i+batch_size]))
 
-    combined_embeddings = torch.stack(combined_embeddings)
-    unfolded_outputs = torch.stack(unfolded_outputs)
-    unfolded_labels = torch.tensor(np.array(unfolded_labels)).to(device)
+    # combined_embeddings = torch.stack(combined_embeddings)
+    # unfolded_outputs = torch.stack(unfolded_outputs)
+    # unfolded_labels = torch.tensor(np.array(unfolded_labels)).to(device)
 
-    loss1 = loss_fn1(combined_embeddings, unfolded_outputs, unfolded_labels)
+    # loss1 = loss_fn1(combined_embeddings, unfolded_outputs, unfolded_labels)
+
+    loss1 = torch.tensor(0.0).to(device)
     return outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, loss1
 
 @autocast()
@@ -159,10 +160,10 @@ def get_metrics(results):
     
     # calculate the metrics
     overall_accuracy = accuracy_score(unfolded_original_labels, unfolded_preds)
-    overall_f1 = f1_score(unfolded_original_labels, unfolded_preds)
+    overall_f1 = f1_score(unfolded_original_labels, unfolded_preds, average='macro')
 
     nli_accuracy = accuracy_score(unfolded_dynamic_labels, unfolded_preds)
-    nli_f1 = f1_score(unfolded_dynamic_labels, unfolded_preds)
+    nli_f1 = f1_score(unfolded_dynamic_labels, unfolded_preds, average='macro')
 
     # sum the total difference between the original labels and the dynamic labels
     average_enough_retrieved = 1 - sum(unfolded_original_labels - unfolded_dynamic_labels) / len(unfolded_original_labels) 

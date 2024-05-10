@@ -20,8 +20,8 @@ class Train:
     # performs a single validation step
     @autocast()
     def train_step(self, input_batch, vdb, emb_gen, nli):
-        
-        outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, loss1 = emb_gen_step(input_batch, vdb, emb_gen, self.loss_fn1, self.device)
+        with torch.no_grad():
+            outputs, dynamic_nli_targets, original_nli_targets, percentage_retrieved, loss1 = emb_gen_step(input_batch, vdb, emb_gen, self.loss_fn1, self.device)
         
         # cut the gradient flow
         outputs = outputs.detach()

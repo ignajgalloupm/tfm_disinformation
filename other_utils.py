@@ -43,9 +43,9 @@ def print_tracker(tracking, set_name, ma_ratio=None):
     # plot the metrics
     plt.figure(figsize=(10, 5))
     plt.title('Loss for ' + set_name + ' Set')
-    plt.plot(loss1, label='Loss 1')
+    #plt.plot(loss1, label='Loss 1')
     plt.plot(loss2, label='Loss 2')
-    plt.plot(total_loss, label='Total Loss')
+    #plt.plot(total_loss, label='Total Loss')
     plt.legend()
     plt.show()
     plt.figure(figsize=(10, 5))
