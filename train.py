@@ -7,12 +7,11 @@ import torch
 
 class Train:
 
-    def __init__(self, device, train_loader, loss_fn1, loss_fn2, B, optimizer, model_name):
+    def __init__(self, device, train_loader, loss_fn1, loss_fn2, optimizer, model_name):
         self.device = device
         self.train_loader = train_loader
         self.loss_fn1 = loss_fn1
         self.loss_fn2 = loss_fn2
-        self.B = B
         self.optimizer = optimizer
         self.model_name = model_name
 
@@ -28,7 +27,7 @@ class Train:
 
         preds, loss2 = nli_step(vdb, nli, outputs, dynamic_nli_targets, self.loss_fn2, self.device)
 
-        total_loss = self.B*loss1 + (1-self.B)*loss2
+        total_loss = loss1 + loss2
 
         total_loss.backward()
 
@@ -66,16 +65,15 @@ class Train:
             if i % vdb_refresh_rate == vdb_refresh_rate - 1:
                 vdb.refresh(emb_gen)
 
+        if len(results) > 0:
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
-        self.optimizer.step()
-        self.optimizer.zero_grad()
-
-        # save the results and show the progress
-        metrics = get_metrics(results)
-        results = []
-        for k, v in metrics.items():
-            tracking_train[k].append(v)
-        print_progress(epoch=epoch, batch=i, num_total_batches=len(self.train_loader), tracking_train=tracking_train, tracking_eval=tracking_eval, ma_ratio=0.1)
+            # save the results and show the progress
+            metrics = get_metrics(results)
+            for k, v in metrics.items():
+                tracking_train[k].append(v)
+            print_progress(epoch=epoch, batch=i, num_total_batches=len(self.train_loader), tracking_train=tracking_train, tracking_eval=tracking_eval, ma_ratio=0.1)
 
 
         # save the model if it is the best one, return True if it is not to stop the training

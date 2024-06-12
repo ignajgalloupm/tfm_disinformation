@@ -20,6 +20,7 @@ class WikiDataset(Dataset):
         self.reduced = reduced
         self.num_extra_pages = num_extra_pages
         self.seed = seed
+        self.current_block = {'subfix': '000', 'data': None}
         self.__initialization__()
 
     def __initialization__(self):
@@ -42,7 +43,7 @@ class WikiDataset(Dataset):
                 self.dataset = self.dataset + random.sample(rest, self.num_extra_pages)
 
         else:
-            self.dataset = [range(TOTAL_WIKI_PAGES)]
+            self.dataset = [i for i in range(TOTAL_WIKI_PAGES)]
 
         if self.in_mem:
             self.dataset = self.__to_mem__(self.dataset)
@@ -79,19 +80,27 @@ class WikiDataset(Dataset):
     
 
     def __to_mem__(self, indices):
-        ## for each file, get the list of pages we need
-        pages = {}
-        for index in indices:
-            file_subfix, subindex = index//PAGES_PER_FILE, index%PAGES_PER_FILE
-            # file_subfix has to be three digits
-            file_subfix = str(file_subfix+1).zfill(3)
-            pages[file_subfix] = pages.get(file_subfix, []) + [subindex]
+        if self.reduced:
+            ## for each file, get the list of pages we need
+            pages = {}
+            for index in indices:
+                file_subfix, subindex = index//PAGES_PER_FILE, index%PAGES_PER_FILE
+                # file_subfix has to be three digits
+                file_subfix = str(file_subfix+1).zfill(3)
+                pages[file_subfix] = pages.get(file_subfix, []) + [subindex]
+            ## for each file, get the pages
+            data = []
+            with multiprocessing.Pool(10) as pool:
+                data = pool.starmap(self.__getbulk_fom_disk__, pages.items())
+            return [page for sublist in data for page in sublist]
         
-        ## for each file, get the pages
-        data = []
-        with multiprocessing.Pool(10) as pool:
-            data = pool.starmap(self.__getbulk_fom_disk__, pages.items())
-        return [page for sublist in data for page in sublist]
+        else:
+            ## get all the pages
+            pages = [i for i in range(1, TOTAL_WIKI_PAGES//PAGES_PER_FILE + 2)]
+            data = []
+            with multiprocessing.Pool(10) as pool:
+                data = pool.map(self.__get_all_from_disk__, pages)
+            return [page for sublist in data for page in sublist]
          
             
     def __getbulk_fom_disk__(self, file_subfix, subindices):
@@ -101,17 +110,27 @@ class WikiDataset(Dataset):
                 if i in subindices:
                     data.append(json.loads(line))
         return data
+    
+    def __get_all_fom_disk__(self, index):
+        file_subfix = str(index).zfill(3)
+        data = []
+        with open(f'wiki-pages/wiki-{file_subfix}.jsonl', 'r') as f:
+            data = jsonlist.load(f)
+        return data
 
-    def __getitem_fom_disk__(self, index):
+
+    def __getitem_from_disk__(self, index):
         file_subfix, subindex = index//PAGES_PER_FILE, index%PAGES_PER_FILE
         # file_subfix has to be three digits
         file_subfix = str(file_subfix+1).zfill(3)
 
+        if self.current_block['subfix'] != file_subfix:
+            with open(f'wiki-pages/wiki-{file_subfix}.jsonl', 'r') as f:
+                self.current_block['data'] = jsonlist.load(f)
+            self.current_block['subfix'] = file_subfix
+
         # find the page in the file (avoid loading the whole file)
-        with open(f'wiki-pages/wiki-{file_subfix}.jsonl', 'r') as f:
-            for i, line in enumerate(f):
-                if i == subindex:
-                    return json.loads(line)
+        return self.current_block['data'][subindex]
 
 
     def __len__(self):            
@@ -122,8 +141,14 @@ class WikiDataset(Dataset):
         if self.in_mem:
             return index
         else: 
-            return self.__getitem_fom_disk__(index)
+            return self.__getitem_from_disk__(index)
         
 
     def refresh(self):
         self.__initialization__()
+
+    # def get_random_ids(self, top=10):
+    #     if self.in_mem:
+    #         random.sample(self.dataset, top)
+    #     else:
+    #         return random.sample(range(TOTAL_WIKI_PAGES), top)

@@ -31,10 +31,15 @@ class VectorDatabase():
             self.__start_collection__(emb_gen)
         elif self.host == 'docker':
             self.client = QdrantClient(f'{self.ip}:{self.port}')
-            if self.collection in [c.name for c in self.client.get_collections().collections]:
+            if self.collection == 'v0' or self.collection == 'v1' and self.collection in [c.name for c in self.client.get_collections().collections]:
+                ## connect
+                print('Collection already exists')
                 ## delete collection
+            elif self.collection in [c.name for c in self.client.get_collections().collections]:
                 self.client.delete_collection(collection_name=self.collection)
-            self.__start_collection__(emb_gen)
+                self.__start_collection__(emb_gen)
+            else:
+                self.__start_collection__(emb_gen)
         else:
             raise Exception('Invalid host type' + self.host)
 
@@ -103,6 +108,7 @@ class VectorDatabase():
 
     def refresh(self, emb_gen):
         self.wiki_loader.dataset.refresh()
+        self.collection = 'v2'
         self.__initialization__(emb_gen)
 
         
