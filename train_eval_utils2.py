@@ -90,7 +90,7 @@ def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
     if input_batch['similar_embs'][0] is not None:
         similar_embeds = [v for v in input_batch['similar_embs']]
         similar_embeds = torch.tensor(np.array(similar_embeds), dtype=torch.float32).to(device)
-        outputs = input_batch['claim_embs']
+        # outputs = input_batch['claim_embs']
         outputs = torch.stack(outputs).to(device)
     
     else:

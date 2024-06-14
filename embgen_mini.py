@@ -29,10 +29,8 @@ class EmbeddingGenerator(torch.nn.Module):
             raise ValueError('Invalid encoder')
         # set the model to half precision
         self.model = model.to(device)
-        
-        
 
-
+        
  
     @autocast()
     def forward(self, texts, mode='sentence'):   
