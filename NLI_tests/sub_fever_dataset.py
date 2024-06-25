@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 
-PAGES_RETRIEVED = 10
+PAGES_RETRIEVED = 5
 
 
 class Sub_Dataset(Dataset):
@@ -16,7 +16,6 @@ class Sub_Dataset(Dataset):
         similar_pages = self.vdb.search_similar(self.dataset['claim_embs'][index].unsqueeze(0), PAGES_RETRIEVED, with_payload=True, with_vector=True)[0]#
         similar_embs = [t.vector for t in similar_pages]
         similar_ids = [t.payload['id'] for t in similar_pages]
-
 
         all_evidence = self.dataset['evidence'][index]['all_evidence'] if self.dataset['evidence'][index]['all_evidence'] != [None] else []
         

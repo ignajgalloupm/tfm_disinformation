@@ -30,8 +30,8 @@ class VectorDatabase():
             self.client = QdrantClient(':memory:')
             self.__start_collection__(emb_gen)
         elif self.host == 'docker':
-            self.client = QdrantClient(f'{self.ip}:{self.port}')
-            if self.collection == 'v0' or self.collection == 'v1' and self.collection in [c.name for c in self.client.get_collections().collections]:
+            self.client = QdrantClient(f'{self.ip}:{self.port}', timeout=1000)
+            if (self.collection == 'v0' or self.collection == 'v1') and self.collection in [c.name for c in self.client.get_collections().collections]:
                 ## connect
                 print('Collection already exists')
                 ## delete collection
@@ -73,7 +73,7 @@ class VectorDatabase():
                     ),
                     wal_config=models.WalConfigDiff(
                         wal_capacity_mb=32,
-                        wal_segments_ahead=0,
+                        wal_segments_ahead=2,
                     ),
                     quantization_config=models.ScalarQuantization(
                         scalar=models.ScalarQuantizationConfig(
@@ -99,7 +99,7 @@ class VectorDatabase():
     @torch.no_grad()
     def __load_data__(self, pages, emb_gen):
         ids, texts = pages['id'], pages['text'] #, pages['lines']
-        embeddings = emb_gen(texts).detach().cpu().numpy()
+        embeddings = emb_gen(texts).detach().cpu().half().numpy()
         num_pages, vector_size = embeddings.shape[0], embeddings.shape[1]
         data = [PointStruct(id=self.__uuid__(id), vector=embeddings[j], payload={'id': id,'text': text}) 
                 for j, id, text in zip(range(num_pages), ids, texts)] #, "lines": lines
@@ -108,7 +108,7 @@ class VectorDatabase():
 
     def refresh(self, emb_gen):
         self.wiki_loader.dataset.refresh()
-        self.collection = 'v2'
+        self.collection = 'vx'
         self.__initialization__(emb_gen)
 
         
@@ -122,6 +122,11 @@ class VectorDatabase():
         search_queries = [models.SearchRequest(vector=queries[i], limit=top, with_payload=with_payload, with_vector=with_vector) for i in range(len(queries))]
         return self.client.search_batch(collection_name=self.collection, requests=search_queries)
     
+
+    def search_dissimilar(self, top=10):
+        pages = self.wiki_loader.dataset.get_random_ids(top)
+        return pages
+
     
     def search_ids(self, ids):
         ids = [self.__uuid__(id) for id in ids]

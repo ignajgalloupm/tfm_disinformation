@@ -7,7 +7,7 @@ import time
 from sub_fever_dataset import Sub_Dataset, Sub_Collator
 
 
-BATCH_SIZE = 8#3
+BATCH_SIZE = 6#3
 
 
 class Train:
@@ -24,10 +24,10 @@ class Train:
     # performs a single validation step
     @autocast()
     def train_step(self, input_batch, emb_gen, nli):
-        with torch.no_grad():
-            outputs, loss1 = emb_gen_step(input_batch, emb_gen, self.loss_fn1, self.device)
+        #with torch.no_grad():
+        outputs, loss1 = emb_gen_step(input_batch, emb_gen, self.loss_fn1, self.device)
         #cut the gradient flow
-        outputs = outputs.detach()
+        # outputs = outputs.detach()
 
         # outputs = input_batch['claim_embs']
         # loss1 = torch.tensor(0.0).to(self.device)
@@ -94,10 +94,10 @@ class Train:
 
             self.train_super_step(sub_dataloader, emb_gen, nli, super_batch, epoch, i, tracking_train, tracking_eval, ma_ratio)
 
-        #vdb.refresh(emb_gen)
-        # if not vdb.wiki_loader.dataset.reduced:
-        #     # sleep for 4 mins
-        #     time.sleep(240)
+        vdb.refresh(emb_gen)
+        if not vdb.wiki_loader.dataset.reduced:
+            # sleep for 10 mins
+            time.sleep(600)
 
             
 

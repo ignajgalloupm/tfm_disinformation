@@ -81,7 +81,7 @@ class WikiDataset(Dataset):
 
     def __to_mem__(self, indices):
         if self.reduced:
-            ## for each file, get the list of pages we need
+            ## form each file, get the list of pages we need
             pages = {}
             for index in indices:
                 file_subfix, subindex = index//PAGES_PER_FILE, index%PAGES_PER_FILE
@@ -130,7 +130,11 @@ class WikiDataset(Dataset):
             self.current_block['subfix'] = file_subfix
 
         # find the page in the file (avoid loading the whole file)
-        return self.current_block['data'][subindex]
+        try:
+            return self.current_block['data'][subindex]
+        except:
+            print(f'Error: {index}, {file_subfix}, {subindex}')
+            return None
 
 
     def __len__(self):            
@@ -147,8 +151,14 @@ class WikiDataset(Dataset):
     def refresh(self):
         self.__initialization__()
 
-    # def get_random_ids(self, top=10):
-    #     if self.in_mem:
-    #         random.sample(self.dataset, top)
-    #     else:
-    #         return random.sample(range(TOTAL_WIKI_PAGES), top)
+    def get_random_ids(self, top=10):
+        if self.in_mem:
+            random.sample(self.dataset, top)
+        else:
+            # get random pages from a single random block
+            indices = random.sample(range(PAGES_PER_FILE), top)
+            random_block = random.randint(0, TOTAL_WIKI_PAGES//PAGES_PER_FILE - 1)
+            indices = [i + PAGES_PER_FILE * random_block for i in indices]
+            return [self.__getitem_from_disk__(index) for index in indices]
+
+            

@@ -4,12 +4,11 @@ import torch
 from torch.cuda.amp import autocast
 
 
-PAGES_FOR_EVIDENCE = 10
-MAX_EVIDENCES = 3
+PAGES_FOR_EVIDENCE = 5
+MAX_EVIDENCES = 2
 
 
 def cap_max_evidences(evidence_texts, max_evidences):
-    #print('Total evidences in batch:', sum([len(e) for e in evidence_texts]), 'will be capped to:', max_evidences * len(evidence_texts), 'evidences')
     # if the sum of the lengths of the evidence texts is less than max_evidences, return all the texts
     if sum([len(e) for e in evidence_texts]) <= max_evidences * len(evidence_texts):
         return evidence_texts
@@ -25,14 +24,37 @@ def cap_max_evidences(evidence_texts, max_evidences):
 
 
 # get the negative examples
-def get_negative_examples(similar_texts, similar_ids, all_evidence):
+def get_negative_examples(dissimilar_texts, similar_ids, evidence_ids):
     negative_examples = []
-    # iterate similar_texts to get the last len(all_evidence) negative examples
-    for i, s in enumerate(zip(similar_texts, similar_ids)):
+    # iterate dissimilar_texts to get the last len(all_evidence) negative examples
+    for i, s in enumerate(zip(dissimilar_texts, similar_ids)):
         text_id_reversed = zip(s[0][::-1], s[1][::-1])
-        n = [t[0] for t in text_id_reversed if t[1] not in all_evidence[i]]
-        negative_examples.append(n[:len(all_evidence[i])])
+        n = [t[0] for t in text_id_reversed if t[1] not in evidence_ids[i]]
+        negative_examples.append(n[:len(evidence_ids[i])])
     return negative_examples
+
+# def get_negative_examples(dissimilar_texts, evidence_texts):
+#     negative_examples = []
+#     for i, s in enumerate(dissimilar_texts):
+#         ne = set()
+#         while len(ne) < len(evidence_texts[i]):
+#             # randomly get a probability of 0.5
+#             p = np.random.rand()
+#             # pick one from the dissimilar texts
+#             if p < 0.5:
+#                 r = np.random.randint(0, len(s))
+#                 element = s[r]
+#             # pick one from the evidence texts that belongs to a different batch
+#             else:
+#                 q = np.random.randint(0, len(evidence_texts))
+#                 r = np.random.randint(0, len(evidence_texts[q]))
+#                 element = evidence_texts[q][r]
+#             # add the element to the negative examples if it is not already there and not in the evidence texts
+#             if element not in ne and element not in evidence_texts[i]:
+#                 ne.add(element)
+#         negative_examples.append(list(ne))
+#     return negative_examples
+
 
 
 @autocast()
@@ -46,6 +68,7 @@ def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
  
     # pick as negative examples the texts of the last len(evidence_texts) of the 50 retrieved pages
     negative_examples = get_negative_examples(input_batch['dissimilar_texts'], input_batch['dissimilar_ids'], input_batch['evidence_ids'])
+    # negative_examples = get_negative_examples(input_batch['dissimilar_texts'], input_batch['evidence_texts'])
 
     # check if there is at least one element in the batch with some evidence
     if all([len(e) == 0 for e in input_batch['evidence_ids']]):
@@ -68,10 +91,10 @@ def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
 
     combined_embeddings = torch.stack(combined_embeddings)
     unfolded_outputs = torch.stack(unfolded_outputs)
-    unfolded_labels = torch.tensor(np.array(unfolded_labels), dtype=torch.float32).to(device)
+    unfolded_labels = torch.tensor(np.array(unfolded_labels), dtype=torch.float32, requires_grad=False).to(device)
 
     
-    loss1 = loss_fn1(combined_embeddings, unfolded_outputs, unfolded_labels)
+    loss1 = loss_fn1(combined_embeddings, unfolded_outputs, unfolded_labels) #* 500
 
 
     # scores = torch.mm(unfolded_outputs, combined_embeddings.transpose(0, 1)) * 20 # code from mpnet fine-tuning on huggingface
@@ -91,11 +114,11 @@ def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
         similar_embeds = [v for v in input_batch['similar_embs']]
         similar_embeds = torch.tensor(np.array(similar_embeds), dtype=torch.float32).to(device)
         # outputs = input_batch['claim_embs']
-        outputs = torch.stack(outputs).to(device)
+        # outputs = torch.stack(outputs).to(device)
     
     else:
-        with torch.no_grad():
-            similar_embeds = [emb_gen(s) for s in input_batch['similar_texts']]
+        #with torch.no_grad():
+        similar_embeds = [emb_gen(s) for s in input_batch['similar_texts']]
         similar_embeds = torch.stack(similar_embeds)
 
 
@@ -107,7 +130,7 @@ def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
     nli_outputs = nli(nli_inputs)
     
     preds = [1 if i > 0 else 0 for i in nli_outputs]
-    targets = torch.tensor(input_batch['dynamic_nli_targets'], dtype=torch.float32).unsqueeze(1).to(device)
+    targets = torch.tensor(input_batch['dynamic_nli_targets'], dtype=torch.float32, requires_grad=False).unsqueeze(1).to(device)
 
     # Convert lists of tensors to tensors
     loss2 = loss_fn2(nli_outputs, targets)

@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 from IPython.display import clear_output
 import numpy as np
 
+
+MODELS = ['NLI_FullLinear_13M', 'NLI_PairsBasic_13M', 'NLI_Heads_13M', 'NLI_MiniHeads_13M',
+            'NLI_FullLinear_3M', 'NLI_PairsBasic_3M', 'NLI_Heads_3M', 'NLI_MiniHeads_3M']
+
 # plots the training and validation loss and f1 score
 def print_progress(epoch, batch, num_total_batches, tracking_train=None, tracking_eval=None, ma_ratio=None):
     clear_output(wait=True)
@@ -25,9 +29,9 @@ def print_tracker(tracking, set_name, ma_ratio=None):
     if ma_ratio is not None:
         ma_size = int(average_enough_retrieved.shape[0] * ma_ratio)
         if ma_size > 0:
-            new_nli_f1 = np.zeros((nli_f1.shape[0] - ma_size + 1, 4))
-            new_loss2 = np.zeros((loss2.shape[0] - ma_size + 1, 4))
-            for i in range(4):
+            new_nli_f1 = np.zeros((nli_f1.shape[0] - ma_size + 1, len(MODELS)))
+            new_loss2 = np.zeros((loss2.shape[0] - ma_size + 1, len(MODELS)))
+            for i in range(len(MODELS)):
                 new_nli_f1[:, i] = np.convolve(nli_f1[:, i], np.ones((ma_size,))/ma_size, mode='valid')
                 new_loss2[:, i] = np.convolve(loss2[:, i], np.ones((ma_size,))/ma_size, mode='valid')
             nli_f1 = new_nli_f1
@@ -40,19 +44,15 @@ def print_tracker(tracking, set_name, ma_ratio=None):
     # plot the metrics
     plt.figure(figsize=(10, 5))
     plt.title('BCELoss for ' + set_name + ' Set')
-    plt.plot(loss2[:, 0], label='NLI_FullLinear')
-    plt.plot(loss2[:, 1], label='NLI_PairsBasic')
-    plt.plot(loss2[:, 2], label='NLI_Heads')
-    plt.plot(loss2[:, 3], label='NLI_MiniHeads')
+    for i, model in enumerate(MODELS):
+        plt.plot(loss2[1:, i], label=model)
     plt.legend()
     plt.show()
     
     plt.figure(figsize=(10, 5))
     plt.title('F1 Score for ' + set_name + ' Set')
-    plt.plot(nli_f1[:, 0], label='NLI_FullLinear')
-    plt.plot(nli_f1[:, 1], label='NLI_PairsBasic')
-    plt.plot(nli_f1[:, 2], label='NLI_Heads')
-    plt.plot(nli_f1[:, 3], label='NLI_MiniHeads')
+    for i, model in enumerate(MODELS):
+        plt.plot(nli_f1[1:, i], label=model)
     plt.legend()
     plt.show()
 

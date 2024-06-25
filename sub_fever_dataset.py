@@ -1,7 +1,8 @@
 from torch.utils.data import Dataset
+import random
 
-PAGES_RETRIEVED = 250
-PAGES_FOR_EVIDENCE = 10
+PAGES_FOR_RETRIEVAL = 200
+PAGES_FOR_EVIDENCE = 5
 MAX_EVIDENCES = 3
 
 
@@ -15,13 +16,17 @@ class Sub_Dataset(Dataset):
         return len(self.dataset['claims'])
 
     def __getitem__(self, index):
-        similar_pages = self.vdb.search_similar(self.dataset['claim_embs'][index].unsqueeze(0), PAGES_RETRIEVED, with_payload=True, with_vector=True)[0]#
-        similar_embs = [t.vector for t in similar_pages]
+        similar_pages = self.vdb.search_similar(self.dataset['claim_embs'][index].unsqueeze(0), PAGES_FOR_RETRIEVAL, with_payload=True, with_vector=False)[0]#
         similar_texts = [t.payload['text'] for t in similar_pages[:PAGES_FOR_EVIDENCE]]
         similar_ids = [t.payload['id'] for t in similar_pages[:PAGES_FOR_EVIDENCE]]
 
-        dissimilar_texts = [t.payload['text'] for t in similar_pages[-2*MAX_EVIDENCES:]]
-        dissimilar_ids = [t.payload['id'] for t in similar_pages[-2*MAX_EVIDENCES:]]
+        # dissimilar_pages = random.sample(similar_pages, 2*MAX_EVIDENCES)
+        dissimilar_pages = similar_pages[-2*MAX_EVIDENCES:]
+        dissimilar_texts = [t.payload['text'] for t in dissimilar_pages]
+        dissimilar_ids = [t.payload['id'] for t in dissimilar_pages]
+        # dissimilar_pages = self.vdb.search_dissimilar(2*MAX_EVIDENCES)
+        # dissimilar_texts = [t['text'] for t in dissimilar_pages]
+        # dissimilar_ids = [t['id'] for t in dissimilar_pages]
 
         if self.set_type == 'train':
             similar_embs = None
@@ -32,7 +37,6 @@ class Sub_Dataset(Dataset):
         all_evidence = self.dataset['evidence'][index]['all_evidence'] if self.dataset['evidence'][index]['all_evidence'] != [None] else []
         evidence_pages = self.vdb.search_ids(all_evidence)
         evidence_texts = [t.payload['text'] for t in evidence_pages]
-        evidence_texts = []
         
         enough_evidence = self.check_enough_evidence(self.dataset['evidence'][index], similar_ids)
         original_nli_target = int(self.dataset['label'][index] == 'SUPPORTS')
@@ -40,7 +44,6 @@ class Sub_Dataset(Dataset):
         percentage_retrieved = len(set(similar_ids).intersection(set(all_evidence))) / len(all_evidence) if all_evidence != [] else 1.0
 
         return {'claim': self.dataset['claims'][index],
-                'claim_emb': self.dataset['claim_embs'][index],
                 'similar_texts': similar_texts,
                 'similar_ids': similar_ids,
                 'dissimilar_texts': dissimilar_texts,
@@ -67,7 +70,6 @@ class Sub_Collator:
 
     def __call__(self, batch):
         claims = [item['claim'] for item in batch]
-        claim_embs = [item['claim_emb'] for item in batch]
         similar_texts = [item['similar_texts'] for item in batch]
         similar_ids = [item['similar_ids'] for item in batch]
         dissimilar_texts = [item['dissimilar_texts'] for item in batch]
@@ -80,7 +82,6 @@ class Sub_Collator:
         percentage_retrieved = [item['percentage_retrieved'] for item in batch]
 
         return {'claims': claims,
-                'claim_embs': claim_embs,
                 'similar_texts': similar_texts,
                 'similar_ids': similar_ids,
                 'similar_embs': similar_embs,

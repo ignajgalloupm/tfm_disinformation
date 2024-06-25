@@ -5,7 +5,7 @@ from torch.cuda.amp import autocast
 
 
 PAGES_RETRIEVED = 50
-PAGES_FOR_EVIDENCE = 10
+PAGES_FOR_EVIDENCE = 5
 MAX_EVIDENCES = 2
 
 

@@ -3,7 +3,7 @@ from sklearn.metrics import accuracy_score, f1_score
 import torch
 from torch.cuda.amp import autocast
 
-
+NUM_MODELS = 8
 
 @autocast()
 def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
@@ -28,13 +28,13 @@ def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
 @torch.no_grad()
 def get_metrics(results):
     # unfold de list of dictionaries
-    unfolded_preds = [[],[],[],[]]
+    unfolded_preds = [[] for _ in range(NUM_MODELS)]
     unfolded_original_labels = []
     unfolded_dynamic_labels = []
     unfolded_percentage_retrieved = []
-    unfolded_loss2 = [[],[],[],[]]
+    unfolded_loss2 = [[] for _ in range(NUM_MODELS)]
     for r in results:
-        for i in range(4):
+        for i in range(NUM_MODELS):
             unfolded_preds[i].extend(r['preds'][i])
             unfolded_loss2[i].append(r['loss2'][i])
         unfolded_original_labels.extend(r['original_labels'])
