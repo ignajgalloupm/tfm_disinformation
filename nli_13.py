@@ -27,8 +27,8 @@ class NLI_FullLinear_13M(torch.nn.Module):
 
     def __init__(self, device='cuda'):
         super(NLI_FullLinear_13M, self).__init__()
-        # input is batch_size x 6 x 768
-        self.l1 = torch.nn.Linear(768*6, 2348)
+        # input is batch_size x 6 x 1024
+        self.l1 = torch.nn.Linear(1024*6, 2348)
         self.l2 = torch.nn.Linear(2348, 1024)
         self.l3 = torch.nn.Linear(1024, 512)
         self.l4 = torch.nn.Linear(512, 64)
@@ -60,11 +60,11 @@ class NLI_PairsBasic_13M(torch.nn.Module):
 
     def __init__(self, device='cuda'):
         super(NLI_PairsBasic_13M, self).__init__()
-        # input is batch_size x 6 x 768
-        self.c1 = torch.nn.Linear(768*2, 1024)
-        self.c2 = torch.nn.Linear(1024, 768)
+        # input is batch_size x 6 x 1024
+        self.c1 = torch.nn.Linear(1024*2, 1024)
+        self.c2 = torch.nn.Linear(1024, 1024)
 
-        self.l1 = torch.nn.Linear(768*5, 2048)
+        self.l1 = torch.nn.Linear(1024*5, 2048)
         self.l2 = torch.nn.Linear(2048, 1024)
         self.l3 = torch.nn.Linear(1024, 512)
         self.l4 = torch.nn.Linear(512, 256)
@@ -110,8 +110,8 @@ class NLI_Heads_13M(torch.nn.Module):
     class head(torch.nn.Module):
         def __init__(self):
             super(NLI_Heads_13M.head, self).__init__()
-            # input is batch_size x 6 x 768
-            self.c1 = torch.nn.Linear(768*2, 512)
+            # input is batch_size x 6 x 1024
+            self.c1 = torch.nn.Linear(1024*2, 512)
             self.c2 = torch.nn.Linear(512, DIMS_1)
         
         def forward(self, pairs):
@@ -176,8 +176,8 @@ class NLI_MiniHeads_13M(torch.nn.Module):
         class mini_head(torch.nn.Module):
             def __init__(self):
                 super(NLI_MiniHeads_13M.head.mini_head, self).__init__()
-                # input is batch_size x 6 x 768
-                self.c1 = torch.nn.Linear(768*2, 256)
+                # input is batch_size x 6 x 1024
+                self.c1 = torch.nn.Linear(1024*2, 256)
                 self.c2 = torch.nn.Linear(256, MINI_DIMS)
             
             def forward(self, pairs):

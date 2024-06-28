@@ -11,6 +11,7 @@ class Sub_Dataset(Dataset):
         self.dataset = data
         self.vdb = vdb
         self.set_type = set_type
+        self.second = False
 
     def __len__(self):            
         return len(self.dataset['claims'])
@@ -22,6 +23,8 @@ class Sub_Dataset(Dataset):
 
         # dissimilar_pages = random.sample(similar_pages, 2*MAX_EVIDENCES)
         dissimilar_pages = similar_pages[-2*MAX_EVIDENCES:]
+        if self.second:
+            dissimilar_pages = similar_pages[-4*MAX_EVIDENCES:-2*MAX_EVIDENCES]
         dissimilar_texts = [t.payload['text'] for t in dissimilar_pages]
         dissimilar_ids = [t.payload['id'] for t in dissimilar_pages]
         # dissimilar_pages = self.vdb.search_dissimilar(2*MAX_EVIDENCES)

@@ -7,7 +7,7 @@ import time
 from sub_fever_dataset import Sub_Dataset, Sub_Collator
 
 
-BATCH_SIZE = 6#3
+BATCH_SIZE = 8#3
 
 
 class Train:
@@ -19,6 +19,7 @@ class Train:
         self.loss_fn2 = loss_fn2
         self.optimizer = optimizer
         self.model_name = model_name
+        self.sub_dataloader = None
 
 
     # performs a single validation step
@@ -83,30 +84,23 @@ class Train:
         
         # get the predictions and the targets for the validation set
         for i, data in enumerate(self.train_loader, 0):
-            emb_gen.eval()
-            with torch.no_grad():
-                claim_embs = emb_gen(data['claims']).detach().half().cpu()
-            data['claim_embs'] = claim_embs
+            if epoch % 2 == 0:
+                emb_gen.eval()
+                with torch.no_grad():
+                    claim_embs = emb_gen(data['claims']).detach().half().cpu()
+                data['claim_embs'] = claim_embs
 
-            sub_dataset = Sub_Dataset(data, vdb, set_type='train')
-            sub_collator = Sub_Collator()
-            sub_dataloader = DataLoader(sub_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=sub_collator, num_workers=8)
+                sub_dataset = Sub_Dataset(data, vdb, set_type='train')
+                sub_collator = Sub_Collator()
+                self.sub_dataloader = DataLoader(sub_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=sub_collator, num_workers=8)
+            else:
+                self.sub_dataloader.dataset.second = True
+            self.train_super_step(self.sub_dataloader, emb_gen, nli, super_batch, epoch, i, tracking_train, tracking_eval, ma_ratio)
 
-            self.train_super_step(sub_dataloader, emb_gen, nli, super_batch, epoch, i, tracking_train, tracking_eval, ma_ratio)
+        if epoch % 2 == 1:
+            vdb.refresh(emb_gen)
+            if not vdb.wiki_loader.dataset.reduced:
+                # sleep for 10 mins
+                time.sleep(600)
 
-        vdb.refresh(emb_gen)
-        if not vdb.wiki_loader.dataset.reduced:
-            # sleep for 10 mins
-            time.sleep(600)
-
-            
-
-
-        # save the model if it is the best one, return True if it is not to stop the training
-        # if loss_eval[-1] == min(loss_eval):
-        #     if pre == False: # for the final model
-        #         torch.save(model.state_dict(), '{0}_{1}.pt'.format(model_name, difficulty))
-        #     elif pre == True: # for the fine-tuned model
-        #         torch.save(model.bert.state_dict(), 'pre_{0}_{1}.pt'.format(model_name, difficulty))
-        #     return False
         return True
