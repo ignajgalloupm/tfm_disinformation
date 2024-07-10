@@ -23,39 +23,6 @@ def cap_max_evidences(evidence_texts, max_evidences):
         return capped_evidence_texts
 
 
-# get the negative examples
-def get_negative_examples(dissimilar_texts, similar_ids, evidence_ids):
-    negative_examples = []
-    # iterate dissimilar_texts to get the last len(all_evidence) negative examples
-    for i, s in enumerate(zip(dissimilar_texts, similar_ids)):
-        text_id_reversed = zip(s[0][::-1], s[1][::-1])
-        n = [t[0] for t in text_id_reversed if t[1] not in evidence_ids[i]]
-        negative_examples.append(n[:len(evidence_ids[i])])
-    return negative_examples
-
-# def get_negative_examples(dissimilar_texts, evidence_texts):
-#     negative_examples = []
-#     for i, s in enumerate(dissimilar_texts):
-#         ne = set()
-#         while len(ne) < len(evidence_texts[i]):
-#             # randomly get a probability of 0.5
-#             p = np.random.rand()
-#             # pick one from the dissimilar texts
-#             if p < 0.5:
-#                 r = np.random.randint(0, len(s))
-#                 element = s[r]
-#             # pick one from the evidence texts that belongs to a different batch
-#             else:
-#                 q = np.random.randint(0, len(evidence_texts))
-#                 r = np.random.randint(0, len(evidence_texts[q]))
-#                 element = evidence_texts[q][r]
-#             # add the element to the negative examples if it is not already there and not in the evidence texts
-#             if element not in ne and element not in evidence_texts[i]:
-#                 ne.add(element)
-#         negative_examples.append(list(ne))
-#     return negative_examples
-
-
 
 @autocast()
 def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
@@ -65,13 +32,10 @@ def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
     outputs = emb_gen(input_batch['claims'])
 
     evidence_texts = cap_max_evidences(input_batch['evidence_texts'], max_evidences=MAX_EVIDENCES)
- 
-    # pick as negative examples the texts of the last len(evidence_texts) of the 50 retrieved pages
-    negative_examples = get_negative_examples(input_batch['dissimilar_texts'], input_batch['dissimilar_ids'], input_batch['evidence_ids'])
-    # negative_examples = get_negative_examples(input_batch['dissimilar_texts'], input_batch['evidence_texts'])
+    negative_examples = [dt[:len(et)] for dt, et in zip(input_batch['dissimilar_texts'], evidence_texts)]
 
     # check if there is at least one element in the batch with some evidence
-    if all([len(e) == 0 for e in input_batch['evidence_ids']]):
+    if all([len(e) == 0 for e in input_batch['evidence_texts']]):
         return outputs, torch.tensor(0.0).to(device)
 
     # combine all the batches
@@ -108,19 +72,10 @@ def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
 
 
 @autocast()
-def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
-
-    if input_batch['similar_embs'][0] is not None:
-        similar_embeds = [v for v in input_batch['similar_embs']]
-        similar_embeds = torch.tensor(np.array(similar_embeds), dtype=torch.float32).to(device)
-        # outputs = input_batch['claim_embs']
-        # outputs = torch.stack(outputs).to(device)
-    
-    else:
-        #with torch.no_grad():
-        similar_embeds = [emb_gen(s) for s in input_batch['similar_texts']]
-        similar_embeds = torch.stack(similar_embeds)
-
+def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):    
+    #with torch.no_grad():
+    similar_embeds = [emb_gen(s) for s in input_batch['similar_texts']]
+    similar_embeds = torch.stack(similar_embeds)
 
     outputs = outputs.unsqueeze(1)
 
@@ -169,8 +124,13 @@ def get_metrics(results):
     nli_accuracy = accuracy_score(unfolded_dynamic_labels, unfolded_preds)
     nli_f1 = f1_score(unfolded_dynamic_labels, unfolded_preds, average='macro')
 
+    changes = unfolded_original_labels - unfolded_dynamic_labels
+    conditional_preds = np.where(changes == 0, unfolded_preds, 0)
+    conditional_accuracy = accuracy_score(unfolded_original_labels, conditional_preds)
+    conditional_f1 = f1_score(unfolded_original_labels, conditional_preds, average='macro')
+
     # sum the total difference between the original labels and the dynamic labels
-    average_enough_retrieved = 1 - sum(unfolded_original_labels - unfolded_dynamic_labels) / len(unfolded_original_labels) 
+    average_enough_retrieved = 1 - sum(changes) / len(unfolded_original_labels) 
     average_total_retrieved = sum(unfolded_percentage_retrieved) / len(unfolded_percentage_retrieved)
     average_loss1 = sum(unfolded_loss1) / len(unfolded_loss1)
     average_loss2 = sum(unfolded_loss2) / len(unfolded_loss2)
@@ -180,6 +140,8 @@ def get_metrics(results):
             'nli_f1': nli_f1, 
             'overall_accuracy': overall_accuracy, 
             'overall_f1': overall_f1, 
+            'conditional_accuracy': conditional_accuracy,
+            'conditional_f1': conditional_f1,
             'average_enough_retrieved': average_enough_retrieved,
             'average_total_retrieved': average_total_retrieved,
             'average_loss1': average_loss1, 

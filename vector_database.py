@@ -31,10 +31,8 @@ class VectorDatabase():
             self.__start_collection__(emb_gen)
         elif self.host == 'docker':
             self.client = QdrantClient(f'{self.ip}:{self.port}', timeout=1000)
-            if (self.collection == 'v1') and self.collection in [c.name for c in self.client.get_collections().collections]:
-                ## connect
+            if (self.collection == 'v1' or self.collection == 've') and self.collection in [c.name for c in self.client.get_collections().collections]:
                 print('Collection already exists')
-                ## delete collection
             elif self.collection in [c.name for c in self.client.get_collections().collections]:
                 self.client.delete_collection(collection_name=self.collection)
                 self.__start_collection__(emb_gen)
@@ -106,9 +104,11 @@ class VectorDatabase():
         return data, vector_size
     
 
-    def refresh(self, emb_gen):
+    def refresh(self, emb_gen, name='vx', delete=False):
+        if delete:
+            self.client.delete_collection(collection_name=self.collection)
         self.wiki_loader.dataset.refresh()
-        self.collection = 'vy'
+        self.collection = name
         self.__initialization__(emb_gen)
 
         

@@ -15,9 +15,10 @@ PAGES_PER_FILE = 50000
 
 
 class WikiDataset(Dataset):
-    def __init__(self, in_mem=False, reduced=True, num_extra_pages=0, seed=None):
+    def __init__(self, in_mem=False, reduced=True, evidence=False, num_extra_pages=0, seed=None):
         self.in_mem = in_mem
         self.reduced = reduced
+        self.evidence = evidence
         self.num_extra_pages = num_extra_pages
         self.seed = seed
         self.current_block = {'subfix': '000', 'data': None}
@@ -28,10 +29,10 @@ class WikiDataset(Dataset):
         self.dataset = []
         if self.reduced:
             # chech if file fever/reduced_indices.txt exists
-            if not os.path.isfile(f'fever/reduced_indices.txt'):
+            if not os.path.isfile(f'fever/reduced_indices_all.txt'):
                 # if it does not exist, create it
                 self.__create_reduced_indices__()
-            with open(f'fever/reduced_indices.txt') as f:
+            with open(f'fever/reduced_indices_all.txt') as f:
                 indices = f.read()
                 # keep in self.dataset only the pages that are in indices
                 self.dataset = ast.literal_eval(indices)
@@ -41,6 +42,17 @@ class WikiDataset(Dataset):
                 all_pages = set(range(TOTAL_WIKI_PAGES))
                 rest = all_pages - set(self.dataset)
                 self.dataset = self.dataset + random.sample(rest, self.num_extra_pages)
+                self.dataset.sort()
+
+        elif self.evidence:
+            # chech if file fever/reduced_indices_evidence.txt exists
+            if not os.path.isfile(f'fever/reduced_indices_evidence.txt'):
+                # if it does not exist, create it
+                self.__create_reduced_indices__()
+            with open(f'fever/reduced_indices_evidence.txt') as f:
+                indices = f.read()
+                # keep in self.dataset only the pages that are in indices
+                self.dataset = ast.literal_eval(indices)
 
         else:
             self.dataset = [i for i in range(TOTAL_WIKI_PAGES)]
@@ -60,27 +72,28 @@ class WikiDataset(Dataset):
                     if unicodedata.normalize('NFC', page['id']) in wiki_dict:
                         indices.append(counter)
                     counter += 1
-        with open(f'fever/reduced_indices.txt', mode='w') as f:
+        file_subfix = 'all' if self.reduced else 'evidence'
+        with open(f'fever/reduced_indices_{file_subfix}.txt', mode='w') as f:
             f.write(str(indices))
     
 
     def __wiki_dict__(self):
         wiki_dict = {}
-        fever = FeverDataset('train')
-        for statement in fever:
-            for evidence in statement['evidence']['all_evidence']:
-                if evidence is not None:
-                    wiki_dict[evidence] = wiki_dict.get(evidence, []) + [statement['id']]
-        fever = FeverDataset('dev')
-        for statement in fever:
-            for evidence in statement['evidence']['all_evidence']:
-                if evidence is not None:
-                    wiki_dict[evidence] = wiki_dict.get(evidence, []) + [statement['id']]
+        if self.reduced:
+            sets = ['train', 'eval', 'test']
+        if self.evidence:
+            sets = ['train']
+        for set in sets:
+            fever = FeverDataset(set)
+            for statement in fever:
+                for evidence in statement['evidence']['all_evidence']:
+                    if evidence is not None:
+                        wiki_dict[evidence] = wiki_dict.get(evidence, []) + [statement['id']]
         return wiki_dict
     
 
     def __to_mem__(self, indices):
-        if self.reduced:
+        if self.reduced or self.evidence:
             ## form each file, get the list of pages we need
             pages = {}
             for index in indices:
@@ -111,7 +124,7 @@ class WikiDataset(Dataset):
                     data.append(json.loads(line))
         return data
     
-    def __get_all_fom_disk__(self, index):
+    def __get_all_from_disk__(self, index):
         file_subfix = str(index).zfill(3)
         data = []
         with open(f'wiki-pages/wiki-{file_subfix}.jsonl', 'r') as f:
@@ -149,7 +162,8 @@ class WikiDataset(Dataset):
         
 
     def refresh(self):
-        self.__initialization__()
+        if self.reduced and self.seed is None:
+            self.__initialization__()
 
     def get_random_ids(self, top=10):
         if self.in_mem:

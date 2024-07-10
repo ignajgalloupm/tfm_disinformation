@@ -9,6 +9,7 @@ NUM_MODELS = 8
 def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
     similar_embeds = [v for v in input_batch['similar_embs']]
     similar_embeds = torch.tensor(np.array(similar_embeds), dtype=torch.float32).to(device)
+    
     outputs = torch.stack(outputs).to(device)
     outputs = outputs.unsqueeze(1)
 
@@ -49,14 +50,28 @@ def get_metrics(results):
     unfolded_percentage_retrieved = np.array(unfolded_percentage_retrieved)
     
     # calculate the metrics
+    overall_accuracy = [accuracy_score(unfolded_original_labels, unfolded_preds[i]) for i in range(len(unfolded_preds))]
+    overall_f1 = [f1_score(unfolded_original_labels, unfolded_preds[i], average='macro') for i in range(len(unfolded_preds))]
+
     nli_f1 = [f1_score(unfolded_dynamic_labels, unfolded_preds[i], average='macro') for i in range(len(unfolded_preds))]
+    nli_accuracy = [accuracy_score(unfolded_dynamic_labels, unfolded_preds[i]) for i in range(len(unfolded_preds))]
+
+    changes = unfolded_original_labels - unfolded_dynamic_labels
+    conditional_preds = np.where(changes == 0, unfolded_preds, 0)
+    conditional_accuracy = [accuracy_score(unfolded_original_labels, conditional_preds[i]) for i in range(len(unfolded_preds))]
+    conditional_f1 = [f1_score(unfolded_original_labels, conditional_preds[i], average='macro') for i in range(len(unfolded_preds))]
 
     # sum the total difference between the original labels and the dynamic labels
     average_enough_retrieved = 1 - np.sum(unfolded_original_labels - unfolded_dynamic_labels) / len(unfolded_original_labels) 
     average_total_retrieved = np.sum(unfolded_percentage_retrieved) / len(unfolded_percentage_retrieved)
     average_loss2 = np.sum(unfolded_loss2, axis=-1) / len(unfolded_loss2[0])
 
-    return { 'nli_f1': nli_f1, 
+    return {'nli_f1': nli_f1,
+            'nli_accuracy': nli_accuracy,
+            'overall_accuracy': overall_accuracy,
+            'overall_f1': overall_f1,
+            'conditional_accuracy': conditional_accuracy,
+            'conditional_f1': conditional_f1,
             'average_enough_retrieved': average_enough_retrieved.tolist(),
             'average_total_retrieved': average_total_retrieved.tolist(), 
             'average_loss2': average_loss2.tolist()}

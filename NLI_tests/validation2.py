@@ -7,14 +7,10 @@ from NLI_tests.sub_fever_dataset import Sub_Dataset, Sub_Collator
 
 class Validation:
 
-    def __init__(self, device, eval_loader, loss_fn1, loss_fn2, model_name, vdb, emb_gen):
+    def __init__(self, device, eval_loader, loss_fn2, vdb, emb_gen):
         self.device = device
         self.eval_loader = eval_loader
-        self.loss_fn1 = loss_fn1
         self.loss_fn2 = loss_fn2
-        self.model_name = model_name
-        self.vdb = vdb
-        self.emb_gen = emb_gen
 
         for _, data in enumerate(self.eval_loader, 0):
             with torch.no_grad():
@@ -23,12 +19,12 @@ class Validation:
 
             sub_dataset = Sub_Dataset(data, vdb, set_type='eval')
             sub_collator = Sub_Collator()
-            self.sub_dataloader = DataLoader(sub_dataset, batch_size=64, shuffle=True, collate_fn=sub_collator, num_workers=8)
+            self.sub_dataloader = DataLoader(sub_dataset, batch_size=64, shuffle=True, collate_fn=sub_collator, num_workers=8, pin_memory=True)
 
 
     # performs a single validation step
     @torch.no_grad()
-    def valid_step(self, input_batch, vdb, emb_gen, nli):
+    def valid_step(self, input_batch, emb_gen, nli):
         outputs = input_batch['claim_embs']
         preds, loss2 = nli_step(input_batch, emb_gen, nli, outputs, self.loss_fn2, self.device)
 
@@ -42,14 +38,13 @@ class Validation:
         
 
     # evaluates the model on the validation set and saves the model if it is the best one yet
-    def valid_epoch(self, vdb, emb_gen, nli, tracking_eval):
+    def valid_epoch(self, emb_gen, nli, tracking_eval):
         emb_gen.eval()
         [n.eval() for n in nli]
         results = []
         # get the predictions and the targets for the validation set
-        
         for i, data in enumerate(self.sub_dataloader, 0):
-            result  = self.valid_step(data, vdb, emb_gen, nli)
+            result  = self.valid_step(data, emb_gen, nli)
             results.append(result)
 
         # save the results and show the progress

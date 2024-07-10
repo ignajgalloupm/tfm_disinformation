@@ -28,7 +28,7 @@ class EmbeddingGenerator(torch.nn.Module):
             param.requires_grad = False
         num_encoder_layers = len([p for p in model.encoder.parameters()])
         for i, param in enumerate(model.encoder.parameters()):
-                if i < num_encoder_layers - 50:
+                if i < num_encoder_layers - 55:
                     param.requires_grad = False
 
         self.model = model.to(device)
@@ -61,8 +61,7 @@ class EmbeddingGenerator(torch.nn.Module):
 
                 # Compute token embeddings
                 with torch.autocast(device_type=self.device.type, dtype=torch.float16):
-                    with torch.inference_mode():
-                        model_output = self.model(input_ids=in_ids, attention_mask=at_mask)
+                    model_output = self.model(input_ids=in_ids, attention_mask=at_mask)
                 # Perform pooling and normalization
                 sentence_embeddings = model_output.last_hidden_state[:, 0]
                 sentence_embeddings = F.normalize(sentence_embeddings, p=2, dim=1)
@@ -77,8 +76,8 @@ class EmbeddingGenerator(torch.nn.Module):
             encoded_input = self.tokenizer(texts, max_length=512, padding=True, truncation=True, return_tensors='pt').to(self.device)
             # Compute token embeddings
             with torch.autocast(device_type=self.device.type, dtype=torch.float16):
-                with torch.inference_mode():
-                    model_output = self.model(**encoded_input)
+                model_output = self.model(**encoded_input)
             # Perform pooling and normalization
             output = model_output.last_hidden_state[:, 0]
+            output = F.normalize(output, p=2, dim=1)
         return output

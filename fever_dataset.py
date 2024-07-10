@@ -1,29 +1,26 @@
 import jsonlist
 from torch.utils.data import Dataset
 import unicodedata
-import random
 
 
 class FeverDataset(Dataset):
     def __init__(self, type):
         if type not in ['train', 'eval', 'test']:
-            raise ValueError('type must be one of "train", "dev", or "test"')
-        if type in ['train', 'eval']:
+            raise ValueError('type must be one of "train", "eval", or "test"')
+        if type == 'train':
             # from json file to dictionary
             with open(f'fever/train.jsonl', 'r') as f:
                 data = jsonlist.load(f)
             self.dataset = self.__simplify__(data)
-            # random shuffle with seed
-            random.seed(42)
-            random.shuffle(self.dataset)
-            # perform a random split 80/20 for train and dev
-            split = int(0.9 * len(self.dataset))
-            self.dataset = self.dataset[:split] if type == 'train' else self.dataset[split:]
-        elif type == 'test':
+
+        elif type in ['eval', 'test']:
             # from json file to dictionary
             with open(f'fever/dev.jsonl', 'r') as f:
                 data = jsonlist.load(f)
             self.dataset = self.__simplify__(data)
+            # perform split 50/50 for eval and test
+            split = int(0.5 * len(self.dataset))
+            self.dataset = self.dataset[:split] if type == 'eval' else self.dataset[split:]
 
 
     def __simplify__(self, data):
