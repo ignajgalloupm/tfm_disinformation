@@ -4,8 +4,9 @@ from IPython.display import clear_output
 import numpy as np
 
 
-MODELS = ['NLI_FullLinear_16M', 'NLI_PairsBasic_16M', 'NLI_Heads_16M', 'NLI_MiniHeads_16M',
-            'NLI_FullLinear_4M', 'NLI_PairsBasic_4M', 'NLI_Heads_4M', 'NLI_MiniHeads_4M']
+MODELS = [#'NLI_FullLinear_16M', 'NLI_PairsBasic_16M', 'NLI_Heads_16M', 'NLI_MiniHeads_16M',
+            'NLI_FullLinear_4M', 'NLI_PairsBasic_4M', 'NLI_Heads_4M', 'NLI_MiniHeads_4M',
+            'NLI_FullLinear_300k', 'NLI_PairsBasic_300k', 'NLI_Heads_300k', 'NLI_MiniHeads_300k']
 
 # plots the training and validation loss and f1 score
 def print_progress(epoch, batch, num_total_batches, tracking_train=None, tracking_eval=None, ma_ratio=None):

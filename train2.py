@@ -7,7 +7,7 @@ import time
 from sub_fever_dataset import Sub_Dataset, Sub_Collator
 
 
-BATCH_SIZE = 16#3
+BATCH_SIZE = 4#16
 
 
 class Train:

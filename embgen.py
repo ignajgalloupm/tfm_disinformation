@@ -60,7 +60,7 @@ class EmbeddingGenerator(torch.nn.Module):
             param.requires_grad = False
         num_encoder_layers = len([p for p in model.encoder.parameters()])
         for i, param in enumerate(model.encoder.parameters()):
-                if i < num_encoder_layers - 40:
+                if i < num_encoder_layers - 33:
                         param.requires_grad = False
 
         self.model = model.to(device)

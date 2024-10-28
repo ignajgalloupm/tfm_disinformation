@@ -22,7 +22,7 @@ class Sub_Dataset(Dataset):
 
         if self.set_type == 'train':
             if original_nli_target:
-                if random.random() < 0.5:
+                if random.random() < 0.4:
                     # randomly select 5 indices from the retrieved pages
                     random_indices = random.sample(range(PAGES_FOR_RETRIEVAL), PAGES_FOR_EVIDENCE)
                     selected_pages = [similar_pages[i] for i in random_indices]

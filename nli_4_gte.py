@@ -27,8 +27,8 @@ class NLI_FullLinear_4M(torch.nn.Module):
 
     def __init__(self, device='cuda'):
         super(NLI_FullLinear_4M, self).__init__()
-        # input is batch_size x 6 x 768
-        self.l1 = torch.nn.Linear(768*6, 768)
+        # input is batch_size x 6 x 1024
+        self.l1 = torch.nn.Linear(1024*6, 768)
         self.l2 = torch.nn.Linear(768, 256)
         self.l3 = torch.nn.Linear(256, 64)
         self.l4 = torch.nn.Linear(64, 1)
@@ -57,8 +57,8 @@ class NLI_PairsBasic_4M(torch.nn.Module):
 
     def __init__(self, device='cuda'):
         super(NLI_PairsBasic_4M, self).__init__()
-        # input is batch_size x 11 x 768
-        self.c1 = torch.nn.Linear(768*2, 1024).to(device)
+        # input is batch_size x 11 x 1024
+        self.c1 = torch.nn.Linear(1024*2, 1024).to(device)
         self.c2 = torch.nn.Linear(1024, 396).to(device)
 
         self.l1 = torch.nn.Linear(396*5, 798).to(device)
@@ -101,8 +101,8 @@ class NLI_Heads_4M(torch.nn.Module):
     class head(torch.nn.Module):
         def __init__(self):
             super(NLI_Heads_4M.head, self).__init__()
-            # input is batch_size x 11 x 768
-            self.c1 = torch.nn.Linear(768*2, 512)
+            # input is batch_size x 11 x 1024
+            self.c1 = torch.nn.Linear(1024*2, 512)
             self.c2 = torch.nn.Linear(512, DIMS_1)
         
         def forward(self, pairs):
@@ -161,8 +161,8 @@ class NLI_MiniHeads_4M(torch.nn.Module):
         class mini_head(torch.nn.Module):
             def __init__(self):
                 super(NLI_MiniHeads_4M.head.mini_head, self).__init__()
-                # input is batch_size x 11 x 768
-                self.c1 = torch.nn.Linear(768*2, 256)
+                # input is batch_size x 11 x 1024
+                self.c1 = torch.nn.Linear(1024*2, 256)
                 self.c2 = torch.nn.Linear(256, MINI_DIMS)
             
             def forward(self, pairs):

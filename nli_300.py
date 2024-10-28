@@ -23,18 +23,18 @@ from torch import nn
 
 
 
-class NLI_FullLinear_4M(torch.nn.Module):
+class NLI_FullLinear_300k(torch.nn.Module):
 
     def __init__(self, device='cuda'):
-        super(NLI_FullLinear_4M, self).__init__()
+        super(NLI_FullLinear_300k, self).__init__()
         # input is batch_size x 6 x 768
-        self.l1 = torch.nn.Linear(768*6, 768)
-        self.l2 = torch.nn.Linear(768, 256)
-        self.l3 = torch.nn.Linear(256, 64)
-        self.l4 = torch.nn.Linear(64, 1)
+        self.l1 = torch.nn.Linear(768*6, 64)
+        self.l2 = torch.nn.Linear(64, 32)
+        self.l3 = torch.nn.Linear(32, 8)
+        self.l4 = torch.nn.Linear(8, 1)
 
+        self.lnorm = torch.nn.LayerNorm(64)
         self.dropout = torch.nn.Dropout(0.1)
-        self.lnorm = torch.nn.LayerNorm(768)
 
         # move to device
         self.to(device)
@@ -45,28 +45,29 @@ class NLI_FullLinear_4M(torch.nn.Module):
         x = self.l1(embeddings.view(embeddings.shape[0], -1))
         x = F.leaky_relu(x)
         x = self.lnorm(x)
-        x = F.leaky_relu(self.l2(x))
-        x = F.leaky_relu(self.l3(self.dropout(x)))
+        x = self.dropout(x)
+        x = self.l2(x)
+        x = F.leaky_relu(x)
+        x = self.l3(x)
+        x = F.leaky_relu(x)
         x = self.l4(x)
         return x
     
 
 
 # 0.70
-class NLI_PairsBasic_4M(torch.nn.Module):
+class NLI_PairsBasic_300k(torch.nn.Module):
 
     def __init__(self, device='cuda'):
-        super(NLI_PairsBasic_4M, self).__init__()
+        super(NLI_PairsBasic_300k, self).__init__()
         # input is batch_size x 11 x 768
-        self.c1 = torch.nn.Linear(768*2, 1024).to(device)
-        self.c2 = torch.nn.Linear(1024, 396).to(device)
+        self.c1 = torch.nn.Linear(768*2, 128).to(device)
+        self.l1 = torch.nn.Linear(128*5, 128).to(device)
+        self.l2 = torch.nn.Linear(128, 32).to(device)
+        self.l3 = torch.nn.Linear(32, 8).to(device)
+        self.l4 = torch.nn.Linear(8, 1).to(device)
 
-        self.l1 = torch.nn.Linear(396*5, 798).to(device)
-        self.l2 = torch.nn.Linear(798, 512).to(device)
-        self.l3 = torch.nn.Linear(512, 256).to(device)
-        self.l4 = torch.nn.Linear(256, 1).to(device)
-
-        self.lnorm = torch.nn.LayerNorm(798).to(device)
+        self.lnorm = torch.nn.LayerNorm(128)
         self.dropout = torch.nn.Dropout(0.1).to(device)
 
         # move to device
@@ -80,13 +81,12 @@ class NLI_PairsBasic_4M(torch.nn.Module):
 
         c1 = self.c1(pairs)
         c1 = F.leaky_relu(c1)
-        c2 = self.c2(c1)
-        c2 = F.leaky_relu(self.dropout(c2))
+        c1 = self.dropout(c1)
 
-        l1 = self.l1(c2.view(c2.shape[0], -1))
+        l1 = self.l1(c1.view(c1.shape[0], -1))
         l1 = F.leaky_relu(self.lnorm(l1))
         l2 = self.l2(l1)
-        l2 = F.leaky_relu(self.dropout(l2))
+        l2 = F.leaky_relu(l2)
         l3 = self.l3(l2)
         l3 = F.leaky_relu(l3)
         l4 = self.l4(l3)
@@ -95,15 +95,15 @@ class NLI_PairsBasic_4M(torch.nn.Module):
 
 
 NUM_HEADS_1 = 4
-DIMS_1 = 64
-class NLI_Heads_4M(torch.nn.Module):
+DIMS_1 = 8
+class NLI_Heads_300k(torch.nn.Module):
     
     class head(torch.nn.Module):
         def __init__(self):
-            super(NLI_Heads_4M.head, self).__init__()
+            super(NLI_Heads_300k.head, self).__init__()
             # input is batch_size x 11 x 768
-            self.c1 = torch.nn.Linear(768*2, 512)
-            self.c2 = torch.nn.Linear(512, DIMS_1)
+            self.c1 = torch.nn.Linear(768*2, 48)
+            self.c2 = torch.nn.Linear(48, DIMS_1)
         
         def forward(self, pairs):
             c1 = self.c1(pairs)
@@ -113,13 +113,13 @@ class NLI_Heads_4M(torch.nn.Module):
 
 
     def __init__(self, device='cuda'):
-        super(NLI_Heads_4M, self).__init__()
+        super(NLI_Heads_300k, self).__init__()
         
         self.heads = torch.nn.ModuleList([self.head() for _ in range(NUM_HEADS_1)])
 
-        self.l1 = torch.nn.Linear(NUM_HEADS_1*5*DIMS_1, 256)
-        self.l2 = torch.nn.Linear(256, 64)
-        self.l3 = torch.nn.Linear(64, 1)
+        self.l1 = torch.nn.Linear(NUM_HEADS_1*5*DIMS_1, 64)
+        self.l2 = torch.nn.Linear(64, 8)
+        self.l3 = torch.nn.Linear(8, 1)
 
         self.lnorm = torch.nn.LayerNorm(NUM_HEADS_1*5*DIMS_1)
         self.dropout = torch.nn.Dropout(0.1)
@@ -143,7 +143,7 @@ class NLI_Heads_4M(torch.nn.Module):
         x = self.l1(self.dropout(x))
         x = F.leaky_relu(x)
         x = self.l2(x)
-        x = F.leaky_relu(self.dropout(x))
+        x = F.leaky_relu(x)
         x = self.l3(x)
         return x
 
@@ -152,18 +152,18 @@ class NLI_Heads_4M(torch.nn.Module):
 
 NUM_HEADS = 2
 NUM_MINI_HEADS = 4
-DIMS = 64
-MINI_DIMS = 32
-class NLI_MiniHeads_4M(torch.nn.Module):
+DIMS = 8
+MINI_DIMS = 4
+class NLI_MiniHeads_300k(torch.nn.Module):
     
     class head(torch.nn.Module):
 
         class mini_head(torch.nn.Module):
             def __init__(self):
-                super(NLI_MiniHeads_4M.head.mini_head, self).__init__()
+                super(NLI_MiniHeads_300k.head.mini_head, self).__init__()
                 # input is batch_size x 11 x 768
-                self.c1 = torch.nn.Linear(768*2, 256)
-                self.c2 = torch.nn.Linear(256, MINI_DIMS)
+                self.c1 = torch.nn.Linear(768*2, 24)
+                self.c2 = torch.nn.Linear(24, MINI_DIMS)
             
             def forward(self, pairs):
                 c1 = self.c1(pairs)
@@ -173,12 +173,12 @@ class NLI_MiniHeads_4M(torch.nn.Module):
             
         
         def __init__(self):
-            super(NLI_MiniHeads_4M.head, self).__init__()
+            super(NLI_MiniHeads_300k.head, self).__init__()
             
             self.mini_heads = torch.nn.ModuleList([self.mini_head() for _ in range(NUM_MINI_HEADS)])
 
-            self.l1 = torch.nn.Linear(NUM_MINI_HEADS*5*MINI_DIMS, 384)
-            self.l2 = torch.nn.Linear(384, DIMS)
+            self.l1 = torch.nn.Linear(NUM_MINI_HEADS*5*MINI_DIMS, 16)
+            self.l2 = torch.nn.Linear(16, DIMS)
 
 
         def forward(self, pairs):
@@ -200,13 +200,12 @@ class NLI_MiniHeads_4M(torch.nn.Module):
 
 
     def __init__(self, device='cuda'):
-        super(NLI_MiniHeads_4M, self).__init__()
+        super(NLI_MiniHeads_300k, self).__init__()
         
         self.heads = torch.nn.ModuleList([self.head() for _ in range(NUM_HEADS)])
 
-        self.l1 = torch.nn.Linear(NUM_HEADS*DIMS, 256)
-        self.l2 = torch.nn.Linear(256, 64)
-        self.l3 = torch.nn.Linear(64, 1)
+        self.l1 = torch.nn.Linear(NUM_HEADS*DIMS, 8)
+        self.l2 = torch.nn.Linear(8, 1)
 
         self.lnorm = torch.nn.LayerNorm(NUM_HEADS*DIMS)
         self.dropout = torch.nn.Dropout(0.1)
@@ -225,11 +224,9 @@ class NLI_MiniHeads_4M(torch.nn.Module):
         # Concatenate the outputs of each head
         heads = torch.cat(outputs, dim=1)
     
-        x = heads.view(heads.shape[0], -1)
+        x = self.dropout(heads.view(heads.shape[0], -1))
         x = self.lnorm(x)
-        x = self.l1(self.dropout(x))
+        x = self.l1(x)
         x = F.leaky_relu(x)
         x = self.l2(x)
-        x = F.leaky_relu(self.dropout(x))
-        x = self.l3(x)
         return x

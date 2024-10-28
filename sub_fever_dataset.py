@@ -23,7 +23,7 @@ class Sub_Dataset(Dataset):
 
         if self.set_type == 'train':
             if original_nli_target: 
-                if random.random() < 0.5:
+                if random.random() < 0.4:
                     # randomly select 5 indices from the top 10 retrieved pages
                     random_indices = random.sample(range(10), PAGES_FOR_EVIDENCE)
                     selected_pages = [similar_pages[i] for i in random_indices]
@@ -59,7 +59,7 @@ class Sub_Dataset(Dataset):
         easy_texts = [t['text'] for t in easy_difficulty]
         easy_ids = [t['id'] for t in easy_difficulty]
         filtered_easy_texts = self.filter_evidence(all_evidence, easy_ids, easy_texts)
-        filtered_easy_texts = random.sample(filtered_easy_texts, min(2*MAX_EVIDENCES, len(filtered_easy_texts)))
+        filtered_easy_texts = random.sample(filtered_easy_texts, min(MAX_EVIDENCES, len(filtered_easy_texts)))
 
         medium_difficulty = random.sample(similar_pages[-10:], 5)
         medium_texts = [t.payload['text'] for t in medium_difficulty]
@@ -67,13 +67,13 @@ class Sub_Dataset(Dataset):
         filtered_medium_texts = self.filter_evidence(all_evidence, medium_ids, medium_texts)
         filtered_medium_texts = random.sample(filtered_medium_texts, min(MAX_EVIDENCES, len(filtered_medium_texts)))
 
-        # hard_difficulty = random.sample(similar_pages[:10], 5)
-        # hard_texts = [t.payload['text'] for t in hard_difficulty]
-        # hard_ids = [t.payload['id'] for t in hard_difficulty]
-        # filtered_hard_texts = self.filter_evidence(all_evidence, hard_ids, hard_texts)
-        # filtered_hard_texts = random.sample(filtered_hard_texts, min(MAX_EVIDENCES, len(filtered_hard_texts)))
+        hard_difficulty = random.sample(similar_pages[:10], 5)
+        hard_texts = [t.payload['text'] for t in hard_difficulty]
+        hard_ids = [t.payload['id'] for t in hard_difficulty]
+        filtered_hard_texts = self.filter_evidence(all_evidence, hard_ids, hard_texts)
+        filtered_hard_texts = random.sample(filtered_hard_texts, min(MAX_EVIDENCES, len(filtered_hard_texts)))
 
-        dissimilar_texts = filtered_easy_texts + filtered_medium_texts #+ filtered_hard_texts
+        dissimilar_texts = filtered_easy_texts + filtered_medium_texts + filtered_hard_texts
         random.shuffle(dissimilar_texts)
 
 
