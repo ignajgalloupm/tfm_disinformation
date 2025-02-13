@@ -1,6 +1,6 @@
 import torch
 from train_eval_utils2 import get_metrics, nli_step, emb_gen_step
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from torch.utils.data import DataLoader
 from sub_fever_dataset import Sub_Dataset, Sub_Collator
 
@@ -26,7 +26,7 @@ class Validation:
 
     # performs a single validation step
     @torch.no_grad()
-    @autocast()
+    @autocast(device_type="cuda")   
     def valid_step(self, input_batch, emb_gen, nli):
         outputs, loss1 = emb_gen_step(input_batch, emb_gen, self.loss_fn1, self.device)
         preds, loss2 = nli_step(input_batch, emb_gen, nli, outputs, self.loss_fn2, self.device)

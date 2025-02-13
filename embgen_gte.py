@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModel
 import torch.nn.functional as F
 import os
 import torch
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 

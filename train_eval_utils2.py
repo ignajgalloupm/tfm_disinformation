@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
 import torch
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 
 
 PAGES_FOR_EVIDENCE = 5
@@ -24,7 +24,7 @@ def cap_max_evidences(evidence_texts, max_evidences):
 
 
 
-@autocast()
+@autocast(device_type="cuda")
 def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
     batch_size = len(input_batch['claims'])
 
@@ -71,7 +71,7 @@ def emb_gen_step(input_batch, emb_gen, loss_fn1, device):
     return outputs, loss1
 
 
-@autocast()
+@autocast(device_type="cuda")
 def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):    
     #with torch.no_grad():
     similar_embeds = [emb_gen(s) for s in input_batch['similar_texts']]

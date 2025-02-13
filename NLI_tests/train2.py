@@ -1,6 +1,6 @@
 from NLI_tests.other_utils import print_progress
 from NLI_tests.train_eval_utils2 import get_metrics, nli_step
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 import torch
 from torch.utils.data import DataLoader
 from NLI_tests.sub_fever_dataset import Sub_Dataset, Sub_Collator
@@ -29,7 +29,7 @@ class Train:
 
 
     # performs a single validation step
-    @autocast()
+    @autocast(device_type="cuda")
     def train_step(self, input_batch, emb_gen, nli):
         outputs = input_batch['claim_embs']
         preds, loss2 = nli_step(input_batch, emb_gen, nli, outputs, self.loss_fn2, self.device)

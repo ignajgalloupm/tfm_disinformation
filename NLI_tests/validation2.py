@@ -1,6 +1,6 @@
 import torch
 from NLI_tests.train_eval_utils2 import get_metrics, nli_step
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from torch.utils.data import DataLoader
 from NLI_tests.sub_fever_dataset import Sub_Dataset, Sub_Collator
 

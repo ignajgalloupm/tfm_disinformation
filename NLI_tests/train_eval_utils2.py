@@ -1,11 +1,11 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
 import torch
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 
 NUM_MODELS = 8
 
-@autocast()
+@autocast(device_type="cuda")
 def nli_step(input_batch, emb_gen, nli, outputs, loss_fn2, device):
     similar_embeds = [v for v in input_batch['similar_embs']]
     similar_embeds = torch.tensor(np.array(similar_embeds), dtype=torch.float32).to(device)

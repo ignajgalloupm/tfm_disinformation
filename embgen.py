@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, Auto
 import torch.nn.functional as F
 import os
 import torch
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from torch.utils.data import Dataset, DataLoader
 from torch import nn
 
@@ -97,7 +97,7 @@ class EmbeddingGenerator(torch.nn.Module):
     #         output = self.__mean_pooling_normalization__(model_output, encoded_input['attention_mask'])
     #     return output
  
-    @autocast()
+    @autocast(device_type="cuda")
     def forward(self, texts):   
         if len(texts) > self.batch_size:
             encoded_input = self.tokenizer(texts, padding='max_length', truncation=True, return_tensors='pt')
